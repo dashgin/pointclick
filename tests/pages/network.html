@@ -1,0 +1,9 @@
+<!doctype html>
+<title>Network</title>
+<p id="out">idle</p>
+<button onclick="fetch('/slow?ms=300').then(() => { out.textContent = 'loaded'; const b = document.createElement('button'); b.textContent = 'Loaded result'; this.after(b); })">Fetch then render</button>
+<button onclick="fetch('/slow?ms=10000'); out.textContent = 'polling'">Start long poll</button>
+<div id="spa"></div>
+<script>
+  if (location.search.includes('boot')) fetch('/slow?ms=300').then(() => { spa.innerHTML = '<button>Booted</button>'; });
+</script>

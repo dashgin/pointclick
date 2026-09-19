@@ -1,0 +1,1222 @@
+[
+ {
+  "run": 0,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2329,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    204
+   ],
+   [
+    "act",
+    812
+   ],
+   [
+    "act",
+    487
+   ],
+   [
+    "act",
+    234
+   ],
+   [
+    "act",
+    198
+   ],
+   [
+    "act",
+    392
+   ]
+  ]
+ },
+ {
+  "run": 0,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8251,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    28
+   ],
+   [
+    "browser_click",
+    6072
+   ],
+   [
+    "browser_click",
+    1072
+   ],
+   [
+    "browser_type",
+    9
+   ],
+   [
+    "browser_select_option",
+    16
+   ],
+   [
+    "browser_click",
+    1052
+   ]
+  ]
+ },
+ {
+  "run": 0,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1131,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    56
+   ],
+   [
+    "agent_browser_snapshot",
+    23
+   ],
+   [
+    "agent_browser_click",
+    31
+   ],
+   [
+    "agent_browser_snapshot",
+    29
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    36
+   ],
+   [
+    "agent_browser_click",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_fill",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_select",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ]
+  ]
+ },
+ {
+  "run": 1,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8263,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    26
+   ],
+   [
+    "browser_click",
+    6059
+   ],
+   [
+    "browser_click",
+    1084
+   ],
+   [
+    "browser_type",
+    12
+   ],
+   [
+    "browser_select_option",
+    20
+   ],
+   [
+    "browser_click",
+    1059
+   ]
+  ]
+ },
+ {
+  "run": 1,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1019,
+  "calls": 17,
+  "polls": 5,
+  "chars": 11253,
+  "log": [
+   [
+    "agent_browser_open",
+    52
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_click",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    32
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_fill",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_select",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    51
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    30
+   ]
+  ]
+ },
+ {
+  "run": 1,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2325,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    210
+   ],
+   [
+    "act",
+    824
+   ],
+   [
+    "act",
+    477
+   ],
+   [
+    "act",
+    225
+   ],
+   [
+    "act",
+    214
+   ],
+   [
+    "act",
+    373
+   ]
+  ]
+ },
+ {
+  "run": 2,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1109,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_click",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_click",
+    49
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    31
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_fill",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    29
+   ],
+   [
+    "agent_browser_select",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    23
+   ],
+   [
+    "agent_browser_click",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    31
+   ]
+  ]
+ },
+ {
+  "run": 2,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2287,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    204
+   ],
+   [
+    "act",
+    807
+   ],
+   [
+    "act",
+    461
+   ],
+   [
+    "act",
+    217
+   ],
+   [
+    "act",
+    209
+   ],
+   [
+    "act",
+    389
+   ]
+  ]
+ },
+ {
+  "run": 2,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8239,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    23
+   ],
+   [
+    "browser_click",
+    6074
+   ],
+   [
+    "browser_click",
+    1067
+   ],
+   [
+    "browser_type",
+    9
+   ],
+   [
+    "browser_select_option",
+    14
+   ],
+   [
+    "browser_click",
+    1051
+   ]
+  ]
+ },
+ {
+  "run": 3,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2232,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    208
+   ],
+   [
+    "act",
+    811
+   ],
+   [
+    "act",
+    436
+   ],
+   [
+    "act",
+    199
+   ],
+   [
+    "act",
+    201
+   ],
+   [
+    "act",
+    376
+   ]
+  ]
+ },
+ {
+  "run": 3,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8284,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    25
+   ],
+   [
+    "browser_click",
+    6066
+   ],
+   [
+    "browser_click",
+    1082
+   ],
+   [
+    "browser_type",
+    14
+   ],
+   [
+    "browser_select_option",
+    19
+   ],
+   [
+    "browser_click",
+    1076
+   ]
+  ]
+ },
+ {
+  "run": 3,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1127,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_click",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    22
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_click",
+    51
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    29
+   ],
+   [
+    "agent_browser_snapshot",
+    30
+   ],
+   [
+    "agent_browser_fill",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_select",
+    22
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_click",
+    45
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    31
+   ]
+  ]
+ },
+ {
+  "run": 4,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8285,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    23
+   ],
+   [
+    "browser_click",
+    6076
+   ],
+   [
+    "browser_click",
+    1085
+   ],
+   [
+    "browser_type",
+    14
+   ],
+   [
+    "browser_select_option",
+    17
+   ],
+   [
+    "browser_click",
+    1067
+   ]
+  ]
+ },
+ {
+  "run": 4,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1133,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    43
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_click",
+    52
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    32
+   ],
+   [
+    "agent_browser_snapshot",
+    30
+   ],
+   [
+    "agent_browser_fill",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_select",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_click",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    29
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ]
+  ]
+ },
+ {
+  "run": 4,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2272,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    207
+   ],
+   [
+    "act",
+    800
+   ],
+   [
+    "act",
+    461
+   ],
+   [
+    "act",
+    218
+   ],
+   [
+    "act",
+    199
+   ],
+   [
+    "act",
+    386
+   ]
+  ]
+ },
+ {
+  "run": 5,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1085,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_click",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_fill",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_select",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    30
+   ]
+  ]
+ },
+ {
+  "run": 5,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2338,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    223
+   ],
+   [
+    "act",
+    815
+   ],
+   [
+    "act",
+    473
+   ],
+   [
+    "act",
+    224
+   ],
+   [
+    "act",
+    212
+   ],
+   [
+    "act",
+    391
+   ]
+  ]
+ },
+ {
+  "run": 5,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8259,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    22
+   ],
+   [
+    "browser_click",
+    6054
+   ],
+   [
+    "browser_click",
+    1076
+   ],
+   [
+    "browser_type",
+    15
+   ],
+   [
+    "browser_select_option",
+    18
+   ],
+   [
+    "browser_click",
+    1073
+   ]
+  ]
+ },
+ {
+  "run": 6,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2336,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    201
+   ],
+   [
+    "act",
+    832
+   ],
+   [
+    "act",
+    506
+   ],
+   [
+    "act",
+    201
+   ],
+   [
+    "act",
+    210
+   ],
+   [
+    "act",
+    386
+   ]
+  ]
+ },
+ {
+  "run": 6,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8310,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    26
+   ],
+   [
+    "browser_click",
+    6069
+   ],
+   [
+    "browser_click",
+    1110
+   ],
+   [
+    "browser_type",
+    15
+   ],
+   [
+    "browser_select_option",
+    17
+   ],
+   [
+    "browser_click",
+    1070
+   ]
+  ]
+ },
+ {
+  "run": 6,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1094,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    23
+   ],
+   [
+    "agent_browser_click",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    23
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_click",
+    49
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_fill",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    31
+   ],
+   [
+    "agent_browser_select",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_click",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    29
+   ]
+  ]
+ },
+ {
+  "run": 7,
+  "tool": "playwright",
+  "ok": true,
+  "ms": 8280,
+  "calls": 6,
+  "polls": 0,
+  "chars": 16999,
+  "log": [
+   [
+    "browser_navigate",
+    26
+   ],
+   [
+    "browser_click",
+    6071
+   ],
+   [
+    "browser_click",
+    1085
+   ],
+   [
+    "browser_type",
+    14
+   ],
+   [
+    "browser_select_option",
+    17
+   ],
+   [
+    "browser_click",
+    1065
+   ]
+  ]
+ },
+ {
+  "run": 7,
+  "tool": "agent-browser",
+  "ok": true,
+  "ms": 1134,
+  "calls": 18,
+  "polls": 6,
+  "chars": 12341,
+  "log": [
+   [
+    "agent_browser_open",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_click",
+    23
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_click",
+    54
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    30
+   ],
+   [
+    "agent_browser_snapshot",
+    28
+   ],
+   [
+    "agent_browser_fill",
+    28
+   ],
+   [
+    "agent_browser_snapshot",
+    25
+   ],
+   [
+    "agent_browser_select",
+    25
+   ],
+   [
+    "agent_browser_snapshot",
+    27
+   ],
+   [
+    "agent_browser_click",
+    48
+   ],
+   [
+    "agent_browser_snapshot",
+    24
+   ],
+   [
+    "agent_browser_snapshot",
+    26
+   ],
+   [
+    "agent_browser_snapshot",
+    30
+   ]
+  ]
+ },
+ {
+  "run": 7,
+  "tool": "pointclick",
+  "ok": true,
+  "ms": 2284,
+  "calls": 6,
+  "polls": 0,
+  "chars": 6583,
+  "log": [
+   [
+    "navigate",
+    226
+   ],
+   [
+    "act",
+    805
+   ],
+   [
+    "act",
+    476
+   ],
+   [
+    "act",
+    215
+   ],
+   [
+    "act",
+    191
+   ],
+   [
+    "act",
+    369
+   ]
+  ]
+ }
+]

@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Bench app</title>
+<style>
+  body { font: 15px system-ui; margin: 0; display: grid; grid-template-columns: 180px 1fr; min-height: 100vh; }
+  nav { background: #f3f3f3; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  nav[hidden] { display: none; }
+  main { padding: 24px; }
+  .row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .row a { flex: 1; }
+</style>
+<nav id="nav" hidden><a href="#/home">Home</a><a href="#/tests">Tests</a><a href="#/files">Files</a><a href="#/account">Account</a></nav>
+<main id="main"></main>
+<script>
+// A small SPA shaped like a real dashboard: API calls over the network, hash routes, optional long-poll (?poll=1).
+const POLL = new URLSearchParams(location.search).get('poll') === '1';
+const SUBJECTS = ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Literature'];
+const TESTS = Array.from({length: 40}, (_, i) => ({
+  id: i + 1, title: `${SUBJECTS[i % 6]} — Unit ${Math.floor(i / 6) + 1} review`, questions: 5 + (i * 7) % 20,
+}));
+const api = (data, ms = 120) => fetch(`/api/wait?ms=${ms}`).then(() => structuredClone(data));
+let current = 0;
+// A route that finished loading after the user moved on must not render.
+const h = (html, token = current) => { if (token === current) main.innerHTML = html; };
+let polling = false;
+
+function longPoll() {
+  if (!POLL || polling) return;
+  polling = true;
+  fetch('/api/longpoll').finally(() => { polling = false; setTimeout(longPoll, 50); });
+}
+
+const routes = {
+  '#/login': () => {
+    nav.hidden = true;
+    h(`<h1>Sign in</h1><label>Email <input type="email" id="email"></label>
+       <label>Password <input type="password" id="pw"></label><button id="go" disabled>Continue</button>
+       <h3>Demo accounts</h3><button class="demo">Ada Lovelace</button><button class="demo">Alan Turing</button>`);
+    document.querySelectorAll('.demo').forEach(b => b.onclick = async () => {
+      const token = current;
+      await api({ok: true}, 200);
+      if (token !== current) return;
+      sessionStorage.user = b.textContent;
+      location.hash = '#/home';
+    });
+  },
+  '#/home': async () => {
+    nav.hidden = false;
+    h('<p>Loading…</p>');
+    longPoll();
+    const token = current;
+    const recent = await api(TESTS.slice(0, 5), 300);
+    h(`<h1>Welcome, ${sessionStorage.user}</h1><h2>Recent tests</h2>` +
+      recent.map(t => `<div class="row"><a href="#/tests/${t.id}">${t.title}</a></div>`).join(''), token);
+  },
+  '#/tests': async () => {
+    h('<p>Loading…</p>');
+    const token = current;
+    const all = await api(TESTS, 200);
+    if (token !== current) return;
+    h(`<h1>Tests</h1>
+       <input type="search" aria-label="Search tests" id="q">
+       <label>Sort <select id="sort"><option value="new">Newest</option><option value="az">A–Z</option>
+       <option value="q">Most questions</option></select></label><div id="list"></div>`);
+    const draw = () => {
+      const q = document.getElementById('q').value.toLowerCase();
+      const s = document.getElementById('sort').value;
+      const rows = all.filter(t => t.title.toLowerCase().includes(q)).sort((a, b) =>
+        s === 'az' ? a.title.localeCompare(b.title) : s === 'q' ? b.questions - a.questions : b.id - a.id);
+      document.getElementById('list').innerHTML = rows.map(t => `<div class="row">
+        <a href="#/tests/${t.id}">${t.title}</a><span>${t.questions} questions</span>
+        <button>Start</button><button aria-label="More actions">⋯</button></div>`).join('');
+    };
+    document.getElementById('q').oninput = draw;
+    document.getElementById('sort').onchange = draw;
+    draw();
+  },
+  '#/tests/:id': async (id) => {
+    const token = current;
+    const t = (await api(TESTS, 150)).find(t => t.id === +id);
+    h(`<h1>${t.title}</h1><p>${t.questions} questions</p><button>Start live</button><button>Print</button>`, token);
+  },
+};
+
+function route() {
+  current++;
+  const hash = location.hash || '#/login';
+  const m = hash.match(/^#\/tests\/(\d+)$/);
+  if (m) return routes['#/tests/:id'](m[1]);
+  (routes[hash] || routes['#/login'])();
+}
+addEventListener('hashchange', route);
+route();
+</script>

@@ -1,0 +1,15 @@
+<!doctype html>
+<title>Extra</title>
+<p id="out">idle</p>
+<div id="swap"><button onclick="out.textContent='old'">Unique action</button></div>
+<button class="dup" onclick="out.textContent='start 1'">Start</button>
+<button class="dup" onclick="out.textContent='start 2'">Start</button>
+<ul role="listbox"><li role="option"><a href="#picked">Nested label</a></li></ul>
+<button value="on">Toggle</button>
+<a href="#w">Spaced
+     out    label</a>
+<div style="position:relative;display:inline-block">
+  <button id="covered" onclick="out.textContent='covered clicked'">Covered</button>
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.1)"></div>
+</div>
+<button onclick="setTimeout(() => out.textContent = 'ticked', 1000)">Tick later</button>

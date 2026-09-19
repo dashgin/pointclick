@@ -1,0 +1,41 @@
+[project]
+name = "pointclick"
+version = "0.1.0"
+description = "A browser MCP server with a small footprint: a numbered list of what you can click, and eight tools."
+readme = "README.md"
+authors = [{ name = "Dashgin", email = "dashgin@praxis.az" }]
+license = "MIT"
+license-files = ["LICENSE", "LICENSE-jev"]
+requires-python = ">=3.12"
+keywords = ["mcp", "browser", "playwright", "agent", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = ["mcp>=2", "playwright>=1.50"]
+
+[project.urls]
+Homepage = "https://github.com/dashgin/pointclick"
+Issues = "https://github.com/dashgin/pointclick/issues"
+
+[project.scripts]
+pointclick = "pointclick.server:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.14"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

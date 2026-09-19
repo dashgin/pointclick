@@ -1,0 +1,6 @@
+<!doctype html>
+<title>Frames</title>
+<p id="out">idle</p>
+<iframe style="width:600px;height:150px" srcdoc="<button onclick=&quot;this.textContent='same clicked'&quot;>Same-origin button</button>"></iframe>
+<iframe id="xo" style="width:600px;height:150px"></iframe>
+<script>xo.src = new URLSearchParams(location.search).get('child')</script>

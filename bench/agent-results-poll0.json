@@ -1,0 +1,110 @@
+[
+ {
+  "run": 0,
+  "tool": "pointclick",
+  "ok": true,
+  "answer": "14",
+  "s": 17.4,
+  "wall_s": 22.3,
+  "turns": 7,
+  "context_tokens": 88417,
+  "output_tokens": 646,
+  "cost_usd": 0.0725808
+ },
+ {
+  "run": 0,
+  "tool": "playwright",
+  "ok": true,
+  "answer": "14",
+  "s": 31.3,
+  "wall_s": 36.3,
+  "turns": 13,
+  "context_tokens": 263170,
+  "output_tokens": 1143,
+  "cost_usd": 0.1277116
+ },
+ {
+  "run": 0,
+  "tool": "agent-browser",
+  "ok": true,
+  "answer": "14",
+  "s": 30.2,
+  "wall_s": 34.5,
+  "turns": 12,
+  "context_tokens": 525561,
+  "output_tokens": 879,
+  "cost_usd": 0.24370040000000004
+ },
+ {
+  "run": 1,
+  "tool": "playwright",
+  "ok": true,
+  "answer": "14",
+  "s": 23.3,
+  "wall_s": 28.0,
+  "turns": 14,
+  "context_tokens": 292592,
+  "output_tokens": 1140,
+  "cost_usd": 0.11849500000000002
+ },
+ {
+  "run": 1,
+  "tool": "agent-browser",
+  "ok": true,
+  "answer": "14",
+  "s": 19.1,
+  "wall_s": 24.0,
+  "turns": 12,
+  "context_tokens": 524845,
+  "output_tokens": 756,
+  "cost_usd": 0.22254819999999997
+ },
+ {
+  "run": 1,
+  "tool": "pointclick",
+  "ok": true,
+  "answer": "14",
+  "s": 13.7,
+  "wall_s": 18.1,
+  "turns": 7,
+  "context_tokens": 104512,
+  "output_tokens": 620,
+  "cost_usd": 0.055791
+ },
+ {
+  "run": 2,
+  "tool": "agent-browser",
+  "ok": true,
+  "answer": "14",
+  "s": 16.4,
+  "wall_s": 20.9,
+  "turns": 12,
+  "context_tokens": 525054,
+  "output_tokens": 780,
+  "cost_usd": 0.22290980000000002
+ },
+ {
+  "run": 2,
+  "tool": "pointclick",
+  "ok": true,
+  "answer": "14",
+  "s": 13.4,
+  "wall_s": 17.8,
+  "turns": 7,
+  "context_tokens": 104249,
+  "output_tokens": 581,
+  "cost_usd": 0.0552002
+ },
+ {
+  "run": 2,
+  "tool": "playwright",
+  "ok": true,
+  "answer": "14",
+  "s": 21.7,
+  "wall_s": 26.4,
+  "turns": 13,
+  "context_tokens": 265844,
+  "output_tokens": 1038,
+  "cost_usd": 0.11100080000000001
+ }
+]

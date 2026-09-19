@@ -1,0 +1,22 @@
+<!doctype html>
+<title>Basic</title>
+<h1>Basic</h1>
+<p id="out">idle</p>
+<button onclick="out.textContent='clicked'">Click me</button>
+<button disabled>Disabled</button>
+<label>Name <input id="name"></label>
+<label>Secret <input type="password" id="pw"></label>
+<label>Color <select id="color" onchange="out.textContent='color '+this.value">
+  <option value="r">Red</option><option value="g">Green</option><option value="b">Blue</option>
+</select></label>
+<form onsubmit="event.preventDefault(); out.textContent='submitted '+q.value"><input id="q" aria-label="Query"></form>
+<div id="menu" onmouseenter="more.hidden=false" style="padding:8px;border:1px solid">Hover here
+  <button id="more" hidden onclick="out.textContent='menu'">Hidden item</button></div>
+<label>File <input type="file" id="file" onchange="out.textContent='file '+this.files[0].name"></label>
+<button onclick="setTimeout(()=>{const b=document.createElement('button');b.textContent='Late button';this.after(b)},400)">Load later</button>
+<button onclick="this.remove()">Remove me</button>
+<button onclick="console.log('hello log'); setTimeout(()=>{throw new Error('boom')})">Log and throw</button>
+<button onclick="window.open('/popup.html')">Open popup</button>
+<span aria-hidden="true"><button>Aria hidden</button></span>
+<div style="height:2000px"></div>
+<button onclick="out.textContent='bottom'">Bottom button</button>
