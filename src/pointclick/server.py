@@ -1,8 +1,10 @@
 """pointclick: jev's compact indexed snapshot for the fast path, Playwright for everything else."""
 
 import asyncio
+import functools
 import json
 import os
+from importlib.metadata import version
 from pathlib import Path
 
 from mcp.server.mcpserver import Image, MCPServer
@@ -28,7 +30,7 @@ SETTLE = (
 QUIET, YOUNG, CAP = 0.15, 0.5, 2.0
 IGNORED_REQUESTS = {"image", "media", "font"}
 
-mcp = MCPServer("pointclick")
+mcp = MCPServer("pointclick", version=version("pointclick"))
 S = {
     "pw": None,
     "browser": None,
@@ -40,6 +42,19 @@ S = {
     "notes": [],
     "inflight": {},
 }
+
+
+# Clients may send tool calls in parallel; one browser and one current page serve them in turn.
+_lock = asyncio.Lock()
+
+
+def _one_at_a_time(tool):
+    @functools.wraps(tool)
+    async def run(*args, **kwargs):
+        async with _lock:
+            return await tool(*args, **kwargs)
+
+    return run
 
 
 def _track(page):
@@ -284,6 +299,7 @@ async def _run(coro):
 
 
 @mcp.tool()
+@_one_at_a_time
 async def navigate(url: str) -> str:
     """Open url and return the indexed element table."""
     page = await _page()
@@ -294,6 +310,7 @@ async def navigate(url: str) -> str:
 
 
 @mcp.tool()
+@_one_at_a_time
 async def observe(full: bool = False) -> str:
     """Indexed table of interactive elements (all frames) plus visible text.
     Default: viewport only (compact). full=true: whole page."""
@@ -301,6 +318,7 @@ async def observe(full: bool = False) -> str:
 
 
 @mcp.tool()
+@_one_at_a_time
 async def act(operation: str, target: str = "", text: str = "") -> str:
     """Do one thing, then return the fresh table.
     operation: CLICK | TYPE | SELECT | PRESS | HOVER | SCROLL_DOWN | SCROLL_UP | WAIT.
@@ -343,6 +361,7 @@ async def act(operation: str, target: str = "", text: str = "") -> str:
 
 
 @mcp.tool()
+@_one_at_a_time
 async def upload(target: str, paths: list[str]) -> str:
     """Set files on a file input. target: selector (file inputs are not in the table), e.g. "input[type=file]"."""
 
@@ -354,6 +373,7 @@ async def upload(target: str, paths: list[str]) -> str:
 
 
 @mcp.tool()
+@_one_at_a_time
 async def screenshot(full_page: bool = False) -> Image:
     """JPEG of the current page."""
     page = await _page()
@@ -361,14 +381,19 @@ async def screenshot(full_page: bool = False) -> Image:
 
 
 @mcp.tool()
-async def evaluate(js: str) -> str:
-    """Run JS in the page: an expression, or a function like "() => document.title". Returns JSON."""
+@_one_at_a_time
+async def evaluate(js: str, max_chars: int = 6000) -> str:
+    """Run JS in the page: an expression, or a function like "() => document.title".
+    Returns JSON, cut at max_chars (0: no limit)."""
     page = await _page()
-    result = await page.evaluate(js)
-    return json.dumps(result, ensure_ascii=False, default=str)[:6000]
+    out = json.dumps(await page.evaluate(js), ensure_ascii=False, default=str)
+    if max_chars and len(out) > max_chars:
+        return f"{out[:max_chars]}\n(cut at {max_chars} of {len(out)} chars; max_chars=0 returns all of it)"
+    return out
 
 
 @mcp.tool()
+@_one_at_a_time
 async def console(clear: bool = True) -> str:
     """Console messages and page errors since the last call."""
     lines = S["console"][-100:]
@@ -378,6 +403,7 @@ async def console(clear: bool = True) -> str:
 
 
 @mcp.tool()
+@_one_at_a_time
 async def close() -> str:
     """Close the browser. The next call starts a fresh, empty session."""
     if S["browser"]:

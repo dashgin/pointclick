@@ -1,4 +1,5 @@
 import sys
+from importlib.metadata import version
 
 import pytest
 from mcp import ClientSession, StdioServerParameters
@@ -10,7 +11,8 @@ pytestmark = pytest.mark.anyio
 async def test_over_stdio(origins):
     params = StdioServerParameters(command=sys.executable, args=["-m", "pointclick.server"])
     async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
-        await s.initialize()
+        init = await s.initialize()
+        assert init.server_info.version == version("pointclick")
         tools = {t.name for t in (await s.list_tools()).tools}
         assert tools == {"navigate", "observe", "act", "upload", "screenshot", "evaluate", "console", "close"}
         res = await s.call_tool("navigate", {"url": f"{origins[0]}/basic.html"})

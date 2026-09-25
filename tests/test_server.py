@@ -1,3 +1,5 @@
+import asyncio
+import json
 import re
 import time
 
@@ -258,6 +260,20 @@ async def test_evaluate_json(browser, origins):
     await browser.navigate(f"{origins[0]}/basic.html")
     assert await browser.evaluate("() => ({a: 1, b: [2]})") == '{"a": 1, "b": [2]}'
     assert await browser.evaluate("document.title") == '"Basic"'
+
+
+async def test_evaluate_says_where_it_cut(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    cut = await browser.evaluate("() => 'x'.repeat(20000)")
+    assert cut == '"' + "x" * 5999 + "\n(cut at 6000 of 20002 chars; max_chars=0 returns all of it)"
+    assert await browser.evaluate("() => 'x'.repeat(20000)", max_chars=0) == json.dumps("x" * 20000)
+
+
+async def test_calls_in_flight_together_run_one_at_a_time(browser, origins):
+    # A client may send tool calls in parallel; both must see the one browser and the page navigate opened.
+    nav, obs = await asyncio.gather(browser.navigate(f"{origins[0]}/basic.html"), browser.observe())
+    assert "button 'Click me'" in nav
+    assert "button 'Click me'" in obs
 
 
 async def test_console_log_error_and_clear(browser, origins):

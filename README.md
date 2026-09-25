@@ -95,7 +95,7 @@ Open news.ycombinator.com, go to the second page, and tell me the top story ther
 | `act(operation, target, text)` | `CLICK` `TYPE` `SELECT` `PRESS` `HOVER` `SCROLL_DOWN` `SCROLL_UP` `WAIT` |
 | `upload(target, paths)` | Set files on a file input |
 | `screenshot(full_page=false)` | JPEG |
-| `evaluate(js)` | Run JS in the page, JSON back |
+| `evaluate(js, max_chars=6000)` | Run JS in the page, JSON back. A longer result is cut and says so; `0` for all of it |
 | `console()` | Console messages and page errors since the last call |
 | `close()` | End the session; the next call starts fresh |
 
@@ -201,16 +201,19 @@ it can — locally, with no account and no second model.
 
 - The list is viewport-only by default; long pages take `SCROLL_DOWN` or `observe(full=true)`.
 - Every action returns the whole list, not a diff.
-- Chromium only, one page at a time per server.
+- Chromium only, one page at a time per server. Calls sent in parallel run one after another.
 - No network inspection, PDF export or dialog control; `evaluate` covers some of it.
 
 ## Development
 
 ```bash
 uv sync --group dev
-uv run pytest     # 43 tests; fixture pages served from two local origins
+uv run pytest     # 45 tests; fixture pages served from two local origins
 uv run ruff check . && uv run ruff format --check .
 ```
+
+To release, bump `version` in `pyproject.toml`, then push a matching tag (`v0.1.0`). `release.yml` publishes
+to PyPI through trusted publishing; there is no token to keep.
 
 ## Credits
 
