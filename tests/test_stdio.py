@@ -16,7 +16,7 @@ async def test_over_stdio(origins, tmp_path):
         assert init.server_info.version == version("pointclick")
         listed = (await s.list_tools()).tools
         tools = {t.name for t in listed}
-        assert tools == {"navigate", "observe", "act", "upload", "screenshot", "evaluate", "console", "close"}
+        assert tools == {"navigate", "observe", "act", "upload", "screenshot", "evaluate", "console", "show", "close"}
         # What a model is sent per request, estimated as the README does: JSON characters / 3.5.
         defs = json.dumps(
             [{"name": t.name, "description": t.description, "input_schema": t.input_schema} for t in listed]

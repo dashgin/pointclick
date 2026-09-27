@@ -31,7 +31,13 @@ SETTLE = (
 # pending, or after CAP s. Older requests (long-polls, streams) don't hold it up.
 QUIET, YOUNG, CAP = 0.15, 0.5, 2.0
 IGNORED_REQUESTS = {"image", "media", "font"}
-DESKTOP = {"viewport": {"width": 1280, "height": 800}, "device_scale_factor": 1, "is_mobile": False, "has_touch": False}
+DESKTOP = {
+    "viewport": {"width": 1280, "height": 800},
+    "device_scale_factor": 1,
+    "is_mobile": False,
+    "has_touch": False,
+    "color_scheme": "light",
+}
 
 mcp = MCPServer("pointclick", version=version("pointclick"))
 S = {
@@ -45,6 +51,7 @@ S = {
     "notes": [],
     "inflight": {},
     "device": DESKTOP,
+    "headless": os.environ.get("HEADED") != "1",
 }
 
 
@@ -87,7 +94,7 @@ def _log(line):
 
 async def _launch(pw):
     # Installed Chrome first; Playwright's bundled Chromium when it's missing.
-    headless = os.environ.get("HEADED") != "1"
+    headless = S["headless"]
     channel = os.environ.get("BROWSER_CHANNEL", "chrome")
     if channel == "chromium":
         return await pw.chromium.launch(headless=headless)
@@ -109,10 +116,14 @@ async def _new_context(state=None):
 
 
 async def _page():
+    if S["browser"] and not S["browser"].is_connected():
+        # Someone closed the window.
+        S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={})
     if S["page"] and not S["page"].is_closed():
         return S["page"]
     if not S["pw"]:
         S["pw"] = await async_playwright().start()
+    if not S["browser"]:
         S["browser"] = await _launch(S["pw"])
         await _new_context()
     open_pages = [p for p in S["ctx"].pages if not p.is_closed()]
@@ -122,18 +133,23 @@ async def _page():
     return await S["ctx"].new_page()
 
 
-def _device(spec):
-    m = re.fullmatch(r"(\d+)x(\d+)(?:@(\d+(?:\.\d+)?))?( mobile)?", " ".join(spec.lower().split()))
-    if not m:
-        raise ValueError(f'device looks like "440x956@3 mobile", not {spec!r}')
-    w, h, scale, mobile = m.groups()
-    scale = float(scale or 1)
-    return {
-        "viewport": {"width": int(w), "height": int(h)},
-        "device_scale_factor": int(scale) if scale.is_integer() else scale,
-        "is_mobile": bool(mobile),
-        "has_touch": bool(mobile),
-    }
+def _device(spec, current):
+    m = re.fullmatch(r"(?:(\d+)x(\d+)(?:@(\d+(?:\.\d+)?))?)? ?(mobile)? ?(dark|light)?", " ".join(spec.lower().split()))
+    if not m or not any(m.groups()):
+        raise ValueError(f'device looks like "440x956@3 mobile dark", not {spec!r}')
+    w, h, scale, mobile, scheme = m.groups()
+    device = {**current, "color_scheme": scheme or current["color_scheme"]}
+    if w:
+        scale = float(scale or 1)
+        device.update(
+            viewport={"width": int(w), "height": int(h)},
+            device_scale_factor=int(scale) if scale.is_integer() else scale,
+            is_mobile=bool(mobile),
+            has_touch=bool(mobile),
+        )
+    elif mobile:
+        device.update(is_mobile=True, has_touch=True)
+    return device
 
 
 async def _set_device(device):
@@ -350,9 +366,10 @@ async def _run(coro):
 @_one_at_a_time
 async def navigate(url: str, device: str = "") -> str:
     """Open url and return the indexed element table.
-    device: "WxH@scale", " mobile" for touch, e.g. "440x956@3 mobile". Keeps cookies and storage, closes tabs."""
+    device: "WxH@scale mobile dark", e.g. "440x956@3 mobile" (touch); "dark"/"light" alone keeps the size.
+      Keeps cookies, storage; closes tabs."""
     if device:
-        await _set_device(_device(device))
+        await _set_device(_device(device, S["device"]))
     page = await _page()
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     await _settle(page)
@@ -468,13 +485,48 @@ async def console(clear: bool = True) -> str:
 
 @mcp.tool()
 @_one_at_a_time
+async def show(visible: bool = True) -> str:
+    """Show the window so a person can log in; visible=false hides it. Keeps the session."""
+    if S["browser"] and S["browser"].is_connected() and S["headless"] == (not visible):
+        return await _observe()
+    url = S["page"].url if S["page"] and not S["page"].is_closed() else ""
+    state = None
+    if S["browser"] and S["browser"].is_connected():
+        state = await S["ctx"].storage_state(indexed_db=True)
+        await S["browser"].close()
+    S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, headless=not visible)
+    if not S["pw"]:
+        S["pw"] = await async_playwright().start()
+    S["browser"] = await _launch(S["pw"])
+    await _new_context(state)
+    page = await _page()
+    if url.startswith("http"):
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await _settle(page)
+        await _quiet(page)
+    return await _observe()
+
+
+@mcp.tool()
+@_one_at_a_time
 async def close() -> str:
     """Close the browser. The next call starts a fresh, empty session."""
-    if S["browser"]:
+    if S["browser"] and S["browser"].is_connected():
         await S["browser"].close()
+    if S["pw"]:
         await S["pw"].stop()
     S.update(
-        pw=None, browser=None, ctx=None, page=None, index={}, console=[], fp=None, notes=[], inflight={}, device=DESKTOP
+        pw=None,
+        browser=None,
+        ctx=None,
+        page=None,
+        index={},
+        console=[],
+        fp=None,
+        notes=[],
+        inflight={},
+        device=DESKTOP,
+        headless=os.environ.get("HEADED") != "1",
     )
     return "closed"
 

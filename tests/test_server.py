@@ -316,8 +316,56 @@ async def test_close_resets_the_device(browser, origins):
 
 
 async def test_bad_device_is_refused(browser, origins):
-    with pytest.raises(ValueError, match="440x956@3 mobile"):
+    with pytest.raises(ValueError, match="440x956@3 mobile dark"):
         await browser.navigate(f"{origins[0]}/basic.html", device="iPhone")
+
+
+async def test_device_sets_color_scheme(browser, origins):
+    await browser.navigate(f"{origins[0]}/phone.html", device="390x844@2 mobile dark")
+    got = await browser.evaluate("() => [innerWidth, matchMedia('(prefers-color-scheme: dark)').matches]")
+    assert got == "[390, true]"
+
+
+async def test_scheme_alone_keeps_the_size(browser, origins):
+    await browser.navigate(f"{origins[0]}/phone.html", device="390x844@2 mobile")
+    await browser.navigate(f"{origins[0]}/phone.html", device="dark")
+    got = await browser.evaluate(
+        "() => [innerWidth, devicePixelRatio, matchMedia('(prefers-color-scheme: dark)').matches]"
+    )
+    assert got == "[390, 2, true]"
+    await browser.navigate(f"{origins[0]}/phone.html", device="light")
+    assert await browser.evaluate("() => matchMedia('(prefers-color-scheme: dark)').matches") == "false"
+
+
+# --- show ---
+
+
+async def test_show_in_the_same_mode_keeps_the_browser(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    b = browser.S["browser"]
+    t = await browser.show(visible=False)
+    assert "button 'Click me'" in t and browser.S["browser"] is b
+
+
+async def test_show_relaunch_keeps_storage_device_and_page(browser, origins):
+    await browser.navigate(f"{origins[0]}/phone.html", device="390x844@2 mobile dark")
+    await browser.evaluate("() => { document.cookie = 'a=1'; localStorage.k = 'v'; }")
+    b = browser.S["browser"]
+    browser.S["headless"] = False  # pretend the window is showing; hiding it relaunches headless
+    t = await browser.show(visible=False)
+    assert browser.S["browser"] is not b and browser.S["headless"]
+    assert t.startswith(f"url: {origins[0]}/phone.html")
+    got = await browser.evaluate(
+        "() => [document.cookie, localStorage.k, innerWidth, matchMedia('(prefers-color-scheme: dark)').matches]"
+    )
+    assert got == '["a=1", "v", 390, true]'
+
+
+async def test_closed_window_starts_a_fresh_browser(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.S["browser"].close()
+    t = await browser.navigate(f"{origins[0]}/basic.html")
+    assert "button 'Click me'" in t
 
 
 async def test_evaluate_json(browser, origins):

@@ -40,7 +40,7 @@ sign in, search, sort, open a record, read a number off it. 18 of 18 runs got it
 
 Medians. Cost is the API price Claude Code reports; time is noisy at this sample size.
 
-- **Eight tools, under 1k tokens of definitions.** Playwright MCP's are ~5k, Chrome DevTools MCP's
+- **Nine tools, under 1k tokens of definitions.** Playwright MCP's are ~5k, Chrome DevTools MCP's
   ~7k, agent-browser's ~18k. Clients that load every tool up front pay that on every turn.
 - **Only what you can act on.** No wrapper `div`s, no layout tree: controls, their state, and the
   visible text.
@@ -97,6 +97,7 @@ Open news.ycombinator.com, go to the second page, and tell me the top story ther
 | `screenshot(full_page, format, path)` | JPEG inline, or `format="png"`. With `path`: the file is written there and only its path and pixel size come back |
 | `evaluate(js, max_chars=6000)` | Run JS in the page, JSON back. A longer result is cut and says so; `0` for all of it |
 | `console()` | Console messages and page errors since the last call |
+| `show(visible=true)` | Open the window so a person can log in or pass a check, then `show(false)` to hide it. Same cookies, storage, device and page |
 | `close()` | End the session; the next call starts fresh |
 
 `target` is a number from the list (`"3"`, or `"3:2"` for the second option of a select), or any
@@ -105,13 +106,14 @@ Password and file inputs are never in the list; reach them by selector.
 
 | Env | |
 |---|---|
-| `HEADED=1` | Show the window |
+| `HEADED=1` | Start with the window showing (`show` switches it at any time) |
 | `BROWSER_CHANNEL` | `chrome` (default), `msedge`, or `chromium` for Playwright's bundled build |
 
 ### Store screenshots
 
 The screen is 1280×800 at scale 1 until `navigate` is given a `device`: `"WxH@scale"`, plus
-`" mobile"` for a phone (touch, and the page's `<meta viewport>` is honoured).
+`" mobile"` for a phone (touch, and the page's `<meta viewport>` is honoured), plus `" dark"` or
+`" light"` for the colour scheme. `"dark"` alone switches the scheme and keeps the size.
 
 ```
 navigate("http://localhost:8081/home", device="440x956@3 mobile")
@@ -184,7 +186,7 @@ estimated the same way, JSON characters ÷ 3.5):
 
 | | tools | definitions |
 |---|---|---|
-| **pointclick** | **8** | **~0.9k tokens** |
+| **pointclick** | **9** | **~1.0k tokens** |
 | Playwright MCP | 26 | ~5.2k tokens |
 | Chrome DevTools MCP | 29 | ~6.9k tokens |
 | agent-browser (`core`) | 29 | ~18.4k tokens |
