@@ -369,6 +369,21 @@ async def test_closed_window_starts_a_fresh_browser(browser, origins):
     assert "button 'Click me'" in t
 
 
+async def test_evaluate_that_never_settles_times_out(browser, origins, monkeypatch):
+    monkeypatch.setattr(browser, "EVAL_TIMEOUT", 0.5)
+    await browser.navigate(f"{origins[0]}/basic.html")
+    assert (await browser.evaluate("() => new Promise(() => {})")).startswith("Timed out after 0.5 s")
+    assert await browser.evaluate("document.title") == '"Basic"'
+
+
+async def test_close_is_not_held_up_by_a_running_call(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    hung = asyncio.create_task(browser.evaluate("() => new Promise(() => {})"))
+    await asyncio.sleep(0.2)
+    assert await asyncio.wait_for(browser.close(), 10) == "closed"
+    await asyncio.wait_for(asyncio.gather(hung, return_exceptions=True), 10)  # it ends with the browser
+
+
 async def test_evaluate_json(browser, origins):
     await browser.navigate(f"{origins[0]}/basic.html")
     assert await browser.evaluate("() => ({a: 1, b: [2]})") == '{"a": 1, "b": [2]}'

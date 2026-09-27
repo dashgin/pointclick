@@ -30,6 +30,8 @@ SETTLE = (
 # After an action: done once the DOM has been still for QUIET s and no request younger than YOUNG s is
 # pending, or after CAP s. Older requests (long-polls, streams) don't hold it up.
 QUIET, YOUNG, CAP = 0.15, 0.5, 2.0
+# A promise that never settles would otherwise hold the tool lock, and every later call, forever.
+EVAL_TIMEOUT = 120
 IGNORED_REQUESTS = {"image", "media", "font"}
 DESKTOP = {
     "viewport": {"width": 1280, "height": 800},
@@ -489,7 +491,11 @@ async def evaluate(js: str, max_chars: int = 6000) -> str:
     """Run JS in the page: an expression, or a function like "() => document.title".
     Returns JSON, cut at max_chars (0: no limit)."""
     page = await _page()
-    out = json.dumps(await page.evaluate(js), ensure_ascii=False, default=str)
+    try:
+        result = await asyncio.wait_for(page.evaluate(js), EVAL_TIMEOUT)
+    except TimeoutError:
+        return f"Timed out after {EVAL_TIMEOUT} s; the page may still be running it."
+    out = json.dumps(result, ensure_ascii=False, default=str)
     if max_chars and len(out) > max_chars:
         return f"{out[:max_chars]}\n(cut at {max_chars} of {len(out)} chars; max_chars=0 returns all of it)"
     return out
@@ -532,7 +538,6 @@ async def show(visible: bool = True) -> str:
 
 
 @mcp.tool()
-@_one_at_a_time
 async def close() -> str:
     """Close the browser. The next call starts a fresh, empty session."""
     if S["browser"] and S["browser"].is_connected():
