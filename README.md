@@ -93,7 +93,7 @@ Open news.ycombinator.com, go to the second page, and tell me the top story ther
 | `navigate(url, device)` | Open a page, return the list. `device` switches the screen first ([below](#store-screenshots)) |
 | `observe(full=false)` | The list again. Viewport only unless `full` |
 | `act(operation, target, text)` | `CLICK` `TYPE` `SELECT` `PRESS` `HOVER` `SCROLL_DOWN` `SCROLL_UP` `WAIT` |
-| `upload(target, paths)` | Set files on a file input |
+| `upload(target, paths)` | Set files on a file input, or on the picker a button opens (a hidden input the page clicks) |
 | `screenshot(full_page, format, path)` | JPEG inline, or `format="png"`. With `path`: the file is written there and only its path and pixel size come back |
 | `evaluate(js, max_chars=6000)` | Run JS in the page, JSON back. A longer result is cut and says so; `0` for all of it |
 | `console()` | Console messages and page errors since the last call |

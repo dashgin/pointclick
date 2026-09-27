@@ -455,11 +455,18 @@ async def act(operation: str, target: str = "", text: str = "") -> str:
 @mcp.tool()
 @_one_at_a_time
 async def upload(target: str, paths: list[str]) -> str:
-    """Set files on a file input. target: selector (file inputs are not in the table), e.g. "input[type=file]"."""
+    """Set files on a file input, or on the picker a button opens. target: "input[type=file]" or the button."""
 
     async def do():
         el, _ = await _resolve(target)
-        await el.set_input_files(paths, timeout=5000)
+        if await el.evaluate("e => e.tagName === 'INPUT' && e.type === 'file'"):
+            await el.set_input_files(paths, timeout=5000)
+            return
+        # A picker opened from script (a hidden input's click()) cancels at once unless the chooser is taken.
+        page = await _page()
+        async with page.expect_file_chooser(timeout=5000) as chooser:
+            await el.click(timeout=5000, no_wait_after=True)
+        await (await chooser.value).set_files(paths, timeout=5000)
 
     return await _run(do())
 

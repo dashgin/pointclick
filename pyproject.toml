@@ -1,6 +1,6 @@
 [project]
 name = "pointclick"
-version = "0.3.2"
+version = "0.3.3"
 description = "A browser MCP server with a small footprint: a numbered list of what you can click, and nine tools."
 readme = "README.md"
 authors = [{ name = "Dashgin", email = "dashgin@praxis.az" }]

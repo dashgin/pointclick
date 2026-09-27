@@ -248,6 +248,14 @@ async def test_upload(browser, origins, tmp_path):
     assert await text_of(browser) == "file note.txt"
 
 
+async def test_upload_through_a_button_that_opens_a_picker(browser, origins, tmp_path):
+    f = tmp_path / "page.pdf"
+    f.write_text("x")
+    t = await browser.navigate(f"{origins[0]}/picker.html")
+    await browser.upload(idx(t, "Choose a file"), [str(f)])
+    assert await text_of(browser) == "picked page.pdf"
+
+
 async def test_screenshot_is_jpeg(browser, origins):
     await browser.navigate(f"{origins[0]}/basic.html")
     img = await browser.screenshot()

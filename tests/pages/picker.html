@@ -1,0 +1,11 @@
+<!doctype html>
+<title>Picker</title>
+<button id="pick" onclick="
+  const i = document.createElement('input');
+  i.type = 'file';
+  i.style.display = 'none';
+  i.onchange = () => (out.textContent = 'picked ' + i.files[0].name);
+  document.body.appendChild(i);
+  i.click();
+">Choose a file</button>
+<p id="out"></p>
