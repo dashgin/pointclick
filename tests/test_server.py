@@ -256,6 +256,70 @@ async def test_screenshot_is_jpeg(browser, origins):
     assert len(full.data) > len(img.data)
 
 
+async def test_screenshot_png_inline(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    img = await browser.screenshot(format="png")
+    assert img.data[:4] == b"\x89PNG"
+
+
+async def test_screenshot_to_path_returns_path_and_size(browser, origins, tmp_path):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    png = (tmp_path / "shots" / "home.png").resolve()
+    assert await browser.screenshot(path=str(png)) == f"{png} 1280x800 png"
+    assert png.read_bytes()[:4] == b"\x89PNG"
+    jpg = (tmp_path / "home.jpg").resolve()
+    assert await browser.screenshot(path=str(jpg)) == f"{jpg} 1280x800 jpeg"
+    assert jpg.read_bytes()[:3] == b"\xff\xd8\xff"
+    full = await browser.screenshot(full_page=True, path=str(tmp_path / "full.png"))
+    assert int(full.split("x")[-1].split()[0]) > 800
+
+
+async def test_screenshot_bad_format_is_refused(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    with pytest.raises(ValueError, match="png or jpeg"):
+        await browser.screenshot(format="webp")
+
+
+# --- device ---
+
+
+async def test_device_sets_viewport_scale_and_touch(browser, origins, tmp_path):
+    await browser.navigate(f"{origins[0]}/phone.html", device="440x956@3 mobile")
+    got = await browser.evaluate(
+        "() => [innerWidth, innerHeight, devicePixelRatio, matchMedia('(pointer: coarse)').matches]"
+    )
+    assert got == "[440, 956, 3, true]"
+    assert (await browser.screenshot(path=str(tmp_path / "store.png"))).endswith(" 1320x2868 png")
+
+
+async def test_device_change_keeps_cookies_and_local_storage(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.evaluate("() => { document.cookie = 'a=1'; localStorage.k = 'v'; sessionStorage.s = 'x'; }")
+    t = await browser.navigate(f"{origins[0]}/basic.html", device="390x844@2.5 mobile")
+    assert "button 'Click me'" in t
+    got = await browser.evaluate("() => [document.cookie, localStorage.k, sessionStorage.s ?? null, devicePixelRatio]")
+    assert got == '["a=1", "v", null, 2.5]'
+
+
+async def test_same_device_keeps_the_context(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html", device="1280x800")
+    ctx = browser.S["ctx"]
+    await browser.navigate(f"{origins[0]}/basic.html", device="1280x800@1")
+    assert browser.S["ctx"] is ctx
+
+
+async def test_close_resets_the_device(browser, origins):
+    await browser.navigate(f"{origins[0]}/phone.html", device="440x956@3 mobile")
+    await browser.close()
+    await browser.navigate(f"{origins[0]}/phone.html")
+    assert await browser.evaluate("() => [innerWidth, devicePixelRatio]") == "[1280, 1]"
+
+
+async def test_bad_device_is_refused(browser, origins):
+    with pytest.raises(ValueError, match="440x956@3 mobile"):
+        await browser.navigate(f"{origins[0]}/basic.html", device="iPhone")
+
+
 async def test_evaluate_json(browser, origins):
     await browser.navigate(f"{origins[0]}/basic.html")
     assert await browser.evaluate("() => ({a: 1, b: [2]})") == '{"a": 1, "b": [2]}'

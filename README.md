@@ -90,11 +90,11 @@ Open news.ycombinator.com, go to the second page, and tell me the top story ther
 
 | Tool | |
 |---|---|
-| `navigate(url)` | Open a page, return the list |
+| `navigate(url, device)` | Open a page, return the list. `device` switches the screen first ([below](#store-screenshots)) |
 | `observe(full=false)` | The list again. Viewport only unless `full` |
 | `act(operation, target, text)` | `CLICK` `TYPE` `SELECT` `PRESS` `HOVER` `SCROLL_DOWN` `SCROLL_UP` `WAIT` |
 | `upload(target, paths)` | Set files on a file input |
-| `screenshot(full_page=false)` | JPEG |
+| `screenshot(full_page, format, path)` | JPEG inline, or `format="png"`. With `path`: the file is written there and only its path and pixel size come back |
 | `evaluate(js, max_chars=6000)` | Run JS in the page, JSON back. A longer result is cut and says so; `0` for all of it |
 | `console()` | Console messages and page errors since the last call |
 | `close()` | End the session; the next call starts fresh |
@@ -107,6 +107,21 @@ Password and file inputs are never in the list; reach them by selector.
 |---|---|
 | `HEADED=1` | Show the window |
 | `BROWSER_CHANNEL` | `chrome` (default), `msedge`, or `chromium` for Playwright's bundled build |
+
+### Store screenshots
+
+The screen is 1280×800 at scale 1 until `navigate` is given a `device`: `"WxH@scale"`, plus
+`" mobile"` for a phone (touch, and the page's `<meta viewport>` is honoured).
+
+```
+navigate("http://localhost:8081/home", device="440x956@3 mobile")
+screenshot(path="shots/iphone-6.9/home.png")   → /abs/shots/iphone-6.9/home.png 1320x2868 png
+```
+
+Scale can't change on a live browser context, so a new `device` opens a new one. Cookies,
+localStorage and IndexedDB carry over; open tabs, history and sessionStorage don't. Saving to a
+`path` writes PNG (JPEG for `.jpg`), creates missing folders and keeps the image out of the
+agent's context, so a batch of captures costs a line each. `close()` goes back to 1280×800.
 
 ## How it works
 
@@ -125,7 +140,7 @@ Password and file inputs are never in the list; reach them by selector.
 - **Playwright underneath** handles selectors, uploads, popups (they become the current page),
   screenshots and the console. Every session is a fresh, isolated browser context.
 
-`server.py` is ~350 lines and `snapshot.js` ~110. Small enough to read before you trust it.
+`server.py` is ~400 lines and `snapshot.js` ~110. Small enough to read before you trust it.
 
 ## Benchmarks
 
@@ -169,7 +184,7 @@ estimated the same way, JSON characters ÷ 3.5):
 
 | | tools | definitions |
 |---|---|---|
-| **pointclick** | **8** | **~0.8k tokens** |
+| **pointclick** | **8** | **~0.9k tokens** |
 | Playwright MCP | 26 | ~5.2k tokens |
 | Chrome DevTools MCP | 29 | ~6.9k tokens |
 | agent-browser (`core`) | 29 | ~18.4k tokens |
@@ -195,7 +210,8 @@ it can — locally, with no account and no second model.
   try to instruct your agent. Keep the agent's permissions narrow and confirm consequential steps.
 - Each session is an isolated browser context: no access to your Chrome profile, cookies or
   passwords. Nothing persists after `close()`.
-- `evaluate` runs arbitrary JavaScript in the page; `upload` reads files you name from disk.
+- `evaluate` runs arbitrary JavaScript in the page; `upload` reads files you name from disk, and
+  `screenshot(path=...)` writes one.
 
 ## Limits
 
@@ -208,7 +224,7 @@ it can — locally, with no account and no second model.
 
 ```bash
 uv sync --group dev
-uv run pytest     # 45 tests; fixture pages served from two local origins
+uv run pytest     # 53 tests; fixture pages served from two local origins
 uv run ruff check . && uv run ruff format --check .
 ```
 

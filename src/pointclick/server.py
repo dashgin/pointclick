@@ -4,6 +4,8 @@ import asyncio
 import functools
 import json
 import os
+import re
+import struct
 from importlib.metadata import version
 from pathlib import Path
 
@@ -29,6 +31,7 @@ SETTLE = (
 # pending, or after CAP s. Older requests (long-polls, streams) don't hold it up.
 QUIET, YOUNG, CAP = 0.15, 0.5, 2.0
 IGNORED_REQUESTS = {"image", "media", "font"}
+DESKTOP = {"viewport": {"width": 1280, "height": 800}, "device_scale_factor": 1, "is_mobile": False, "has_touch": False}
 
 mcp = MCPServer("pointclick", version=version("pointclick"))
 S = {
@@ -41,6 +44,7 @@ S = {
     "fp": None,
     "notes": [],
     "inflight": {},
+    "device": DESKTOP,
 }
 
 
@@ -99,19 +103,63 @@ async def _launch(pw):
             ) from None
 
 
+async def _new_context(state=None):
+    S["ctx"] = await S["browser"].new_context(**S["device"], storage_state=state)
+    S["ctx"].on("page", _track)
+
+
 async def _page():
     if S["page"] and not S["page"].is_closed():
         return S["page"]
     if not S["pw"]:
         S["pw"] = await async_playwright().start()
         S["browser"] = await _launch(S["pw"])
-        S["ctx"] = await S["browser"].new_context(viewport={"width": 1280, "height": 800})
-        S["ctx"].on("page", _track)
+        await _new_context()
     open_pages = [p for p in S["ctx"].pages if not p.is_closed()]
     if open_pages:
         S["page"] = open_pages[-1]
         return S["page"]
     return await S["ctx"].new_page()
+
+
+def _device(spec):
+    m = re.fullmatch(r"(\d+)x(\d+)(?:@(\d+(?:\.\d+)?))?( mobile)?", " ".join(spec.lower().split()))
+    if not m:
+        raise ValueError(f'device looks like "440x956@3 mobile", not {spec!r}')
+    w, h, scale, mobile = m.groups()
+    scale = float(scale or 1)
+    return {
+        "viewport": {"width": int(w), "height": int(h)},
+        "device_scale_factor": int(scale) if scale.is_integer() else scale,
+        "is_mobile": bool(mobile),
+        "has_touch": bool(mobile),
+    }
+
+
+async def _set_device(device):
+    # Scale and touch are fixed per context, so a new one takes over the old one's cookies and storage.
+    if device == S["device"]:
+        return
+    S["device"] = device
+    if not S["ctx"]:
+        return
+    state = await S["ctx"].storage_state(indexed_db=True)
+    await S["ctx"].close()
+    S.update(page=None, index={}, fp=None, inflight={})
+    await _new_context(state)
+
+
+def _pixels(data):
+    if data[:4] == b"\x89PNG":
+        return struct.unpack(">II", data[16:24])
+    i = 2
+    while i + 9 < len(data):
+        marker, length = data[i + 1], struct.unpack(">H", data[i + 2 : i + 4])[0]
+        if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+            h, w = struct.unpack(">HH", data[i + 5 : i + 9])
+            return w, h
+        i += 2 + length
+    return 0, 0
 
 
 async def _settle(page):
@@ -300,8 +348,11 @@ async def _run(coro):
 
 @mcp.tool()
 @_one_at_a_time
-async def navigate(url: str) -> str:
-    """Open url and return the indexed element table."""
+async def navigate(url: str, device: str = "") -> str:
+    """Open url and return the indexed element table.
+    device: "WxH@scale", " mobile" for touch, e.g. "440x956@3 mobile". Keeps cookies and storage, closes tabs."""
+    if device:
+        await _set_device(_device(device))
     page = await _page()
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     await _settle(page)
@@ -374,10 +425,23 @@ async def upload(target: str, paths: list[str]) -> str:
 
 @mcp.tool()
 @_one_at_a_time
-async def screenshot(full_page: bool = False) -> Image:
-    """JPEG of the current page."""
+async def screenshot(full_page: bool = False, format: str = "", path: str = "") -> Image | str:
+    """JPEG of the current page, or format="png".
+    path: save there instead (PNG unless .jpg); returns path and pixel size."""
     page = await _page()
-    return Image(data=await page.screenshot(type="jpeg", quality=70, full_page=full_page), format="jpeg")
+    jpeg_path = path.lower().endswith((".jpg", ".jpeg"))
+    fmt = (format or ("jpeg" if not path or jpeg_path else "png")).lower().replace("jpg", "jpeg")
+    if fmt not in ("png", "jpeg"):
+        raise ValueError(f"format is png or jpeg, not {format!r}")
+    quality = (90 if path else 70) if fmt == "jpeg" else None
+    data = await page.screenshot(type=fmt, quality=quality, full_page=full_page)
+    if not path:
+        return Image(data=data, format=fmt)
+    out = Path(path).expanduser().resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(data)
+    w, h = _pixels(data)
+    return f"{out} {w}x{h} {fmt}"
 
 
 @mcp.tool()
@@ -409,7 +473,9 @@ async def close() -> str:
     if S["browser"]:
         await S["browser"].close()
         await S["pw"].stop()
-    S.update(pw=None, browser=None, ctx=None, page=None, index={}, console=[], fp=None, notes=[], inflight={})
+    S.update(
+        pw=None, browser=None, ctx=None, page=None, index={}, console=[], fp=None, notes=[], inflight={}, device=DESKTOP
+    )
     return "closed"
 
 
