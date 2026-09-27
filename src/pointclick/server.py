@@ -152,6 +152,26 @@ def _device(spec, current):
     return device
 
 
+async def _session_storage():
+    # storage_state() leaves sessionStorage out, and some apps keep their login there.
+    page = S["page"]
+    if not page or page.is_closed() or not page.url.startswith("http"):
+        return None
+    try:
+        return page.url, await page.evaluate("() => Object.entries(sessionStorage)")
+    except PWError:
+        return None
+
+
+async def _restore_session_storage(saved):
+    if not saved or not saved[1]:
+        return
+    url, items = saved
+    page = await _page()
+    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    await page.evaluate("items => { for (const [k, v] of items) sessionStorage.setItem(k, v); }", items)
+
+
 async def _set_device(device):
     # Scale and touch are fixed per context, so a new one takes over the old one's cookies and storage.
     if device == S["device"]:
@@ -160,9 +180,11 @@ async def _set_device(device):
     if not S["ctx"]:
         return
     state = await S["ctx"].storage_state(indexed_db=True)
+    session = await _session_storage()
     await S["ctx"].close()
     S.update(page=None, index={}, fp=None, inflight={})
     await _new_context(state)
+    await _restore_session_storage(session)
 
 
 def _pixels(data):
@@ -490,15 +512,17 @@ async def show(visible: bool = True) -> str:
     if S["browser"] and S["browser"].is_connected() and S["headless"] == (not visible):
         return await _observe()
     url = S["page"].url if S["page"] and not S["page"].is_closed() else ""
-    state = None
+    state = session = None
     if S["browser"] and S["browser"].is_connected():
         state = await S["ctx"].storage_state(indexed_db=True)
+        session = await _session_storage()
         await S["browser"].close()
     S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, headless=not visible)
     if not S["pw"]:
         S["pw"] = await async_playwright().start()
     S["browser"] = await _launch(S["pw"])
     await _new_context(state)
+    await _restore_session_storage(session)
     page = await _page()
     if url.startswith("http"):
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)

@@ -298,7 +298,7 @@ async def test_device_change_keeps_cookies_and_local_storage(browser, origins):
     t = await browser.navigate(f"{origins[0]}/basic.html", device="390x844@2.5 mobile")
     assert "button 'Click me'" in t
     got = await browser.evaluate("() => [document.cookie, localStorage.k, sessionStorage.s ?? null, devicePixelRatio]")
-    assert got == '["a=1", "v", null, 2.5]'
+    assert got == '["a=1", "v", "x", 2.5]'
 
 
 async def test_same_device_keeps_the_context(browser, origins):
@@ -349,16 +349,17 @@ async def test_show_in_the_same_mode_keeps_the_browser(browser, origins):
 
 async def test_show_relaunch_keeps_storage_device_and_page(browser, origins):
     await browser.navigate(f"{origins[0]}/phone.html", device="390x844@2 mobile dark")
-    await browser.evaluate("() => { document.cookie = 'a=1'; localStorage.k = 'v'; }")
+    await browser.evaluate("() => { document.cookie = 'a=1'; localStorage.k = 'v'; sessionStorage.s = 'x'; }")
     b = browser.S["browser"]
     browser.S["headless"] = False  # pretend the window is showing; hiding it relaunches headless
     t = await browser.show(visible=False)
     assert browser.S["browser"] is not b and browser.S["headless"]
     assert t.startswith(f"url: {origins[0]}/phone.html")
     got = await browser.evaluate(
-        "() => [document.cookie, localStorage.k, innerWidth, matchMedia('(prefers-color-scheme: dark)').matches]"
+        "() => [document.cookie, localStorage.k, sessionStorage.s, innerWidth,"
+        " matchMedia('(prefers-color-scheme: dark)').matches]"
     )
-    assert got == '["a=1", "v", 390, true]'
+    assert got == '["a=1", "v", "x", 390, true]'
 
 
 async def test_closed_window_starts_a_fresh_browser(browser, origins):

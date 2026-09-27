@@ -120,8 +120,9 @@ navigate("http://localhost:8081/home", device="440x956@3 mobile")
 screenshot(path="shots/iphone-6.9/home.png")   → /abs/shots/iphone-6.9/home.png 1320x2868 png
 ```
 
-Scale can't change on a live browser context, so a new `device` opens a new one. Cookies,
-localStorage and IndexedDB carry over; open tabs, history and sessionStorage don't. Saving to a
+Scale can't change on a live browser context, so a new `device` opens a new one, and `show`
+relaunches the browser. Cookies, localStorage, IndexedDB and the current page's sessionStorage
+(where some apps keep their login) carry over; other tabs and history don't. Saving to a
 `path` writes PNG (JPEG for `.jpg`), creates missing folders and keeps the image out of the
 agent's context, so a batch of captures costs a line each. `close()` goes back to 1280×800.
 
