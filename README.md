@@ -108,6 +108,8 @@ Password and file inputs are never in the list; reach them by selector.
 |---|---|
 | `HEADED=1` | Start with the window showing (`show` switches it at any time) |
 | `BROWSER_CHANNEL` | `chrome` (default), `msedge`, or `chromium` for Playwright's bundled build |
+| `BROWSER_PATH` | Launch this Chromium executable instead: Brave, Arc, Chrome for Testing, a custom build |
+| `POINTCLICK_CDP` | Attach to a browser that is already running (`http://localhost:9222`) instead of launching one ([below](#your-own-browser)) |
 | `POINTCLICK_STATE` | A file (e.g. `~/.pointclick/state.json`) that keeps cookies, localStorage and IndexedDB across restarts: log in once with `show`, stay logged in. Saved after every call, mode 600. Not sessionStorage. It holds your logins: never commit or share it; delete it to log out everywhere |
 
 ### Store screenshots
@@ -126,6 +128,24 @@ relaunches the browser. Cookies, localStorage, IndexedDB and the current page's 
 (where some apps keep their login) carry over; other tabs and history don't. Saving to a
 `path` writes PNG (JPEG for `.jpg`), creates missing folders and keeps the image out of the
 agent's context, so a batch of captures costs a line each. `close()` goes back to 1280×800.
+
+### Your own browser
+
+`POINTCLICK_CDP` attaches over the Chrome DevTools Protocol to a browser you started, so the
+agent works with that profile's cookies and logins. pointclick opens its own tab and leaves your
+other tabs alone; `close()` closes that tab and disconnects, and the browser keeps running.
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 --user-data-dir="$HOME/.pointclick/chrome"
+claude mcp add pointclick -e POINTCLICK_CDP=http://localhost:9222 -- uvx pointclick
+```
+
+Chrome 136 and later ignore `--remote-debugging-port` on the default profile, so give it a
+`--user-data-dir` of its own and log in there once. While attached, `show` does nothing (the window
+is already yours), `device` changes only the size and `dark`/`light` (scale and `mobile` need a
+browser pointclick launches), and `POINTCLICK_STATE` is never written: the profile already keeps
+the logins, and pointclick won't copy them to a file.
 
 ## How it works
 
@@ -214,6 +234,9 @@ it can — locally, with no account and no second model.
   try to instruct your agent. Keep the agent's permissions narrow and confirm consequential steps.
 - Each session is an isolated browser context: no access to your Chrome profile, cookies or
   passwords. Nothing persists after `close()`.
+- `POINTCLICK_CDP` is the exception: the agent acts as you, signed in to everything that profile
+  is, and so does anything else that can reach the debugging port. Keep the port on localhost and
+  use a profile with only the logins the agent needs.
 - `evaluate` runs arbitrary JavaScript in the page; `upload` reads files you name from disk, and
   `screenshot(path=...)` writes one.
 
@@ -228,7 +251,7 @@ it can — locally, with no account and no second model.
 
 ```bash
 uv sync --group dev
-uv run pytest     # 53 tests; fixture pages served from two local origins
+uv run pytest     # 69 tests; fixture pages served from two local origins
 uv run ruff check . && uv run ruff format --check .
 ```
 

@@ -55,12 +55,18 @@ S = {
     "inflight": {},
     "device": DESKTOP,
     "headless": os.environ.get("HEADED") != "1",
+    "mine": set(),
 }
 
 
 # Opt-in: POINTCLICK_STATE=<file> keeps cookies, localStorage and IndexedDB across restarts. Loaded when the
 # browser starts, rewritten after every tool call and before close. Treat the file like a password.
 STATE_FILE = Path(os.environ["POINTCLICK_STATE"]).expanduser() if os.environ.get("POINTCLICK_STATE") else None
+
+# Opt-in: POINTCLICK_CDP=http://localhost:9222 attaches to a browser that is already running, with its profile and
+# logins. pointclick works in tabs it opens and leaves the others alone. BROWSER_PATH launches any Chromium build.
+CDP_URL = os.environ.get("POINTCLICK_CDP") or None
+BROWSER_PATH = os.environ.get("BROWSER_PATH") or None
 
 # Clients may send tool calls in parallel; one browser and one current page serve them in turn.
 _lock = asyncio.Lock()
@@ -90,7 +96,7 @@ def _load_state():
 
 
 async def _save_state():
-    if not STATE_FILE or not S["ctx"] or not (S["browser"] and S["browser"].is_connected()):
+    if CDP_URL or not STATE_FILE or not S["ctx"] or not (S["browser"] and S["browser"].is_connected()):
         return
     try:
         # bounded: an open dialog or file chooser can stall it, and a save must never hold the tool lock
@@ -108,6 +114,8 @@ async def _save_state():
 def _track(page):
     # Popups (OAuth, new tabs) become the current page.
     S["page"] = page
+    S["mine"].add(page)
+    page.on("popup", _track)
     page.on("console", lambda m: _log(f"[{m.type}] {m.text}"))
     page.on("pageerror", lambda e: _log(f"[pageerror] {e}"))
     page.on("request", _request_started)
@@ -132,6 +140,19 @@ def _log(line):
 async def _launch(pw):
     # Installed Chrome first; Playwright's bundled Chromium when it's missing.
     headless = S["headless"]
+    if CDP_URL:
+        try:
+            return await pw.chromium.connect_over_cdp(CDP_URL)
+        except PWError as e:
+            raise RuntimeError(
+                f"No browser at POINTCLICK_CDP={CDP_URL}: {str(e).splitlines()[0]} "
+                "Start one with --remote-debugging-port=9222 --user-data-dir=<a folder>"
+            ) from None
+    if BROWSER_PATH:
+        try:
+            return await pw.chromium.launch(executable_path=BROWSER_PATH, headless=headless)
+        except PWError as e:
+            raise RuntimeError(f"No browser at BROWSER_PATH={BROWSER_PATH}: {str(e).splitlines()[0]}") from None
     channel = os.environ.get("BROWSER_CHANNEL", "chrome")
     if channel == "chromium":
         return await pw.chromium.launch(headless=headless)
@@ -148,14 +169,17 @@ async def _launch(pw):
 
 
 async def _new_context(state=None):
+    if CDP_URL and S["browser"].contexts:
+        # The running browser's own profile: its cookies and logins, not a copy.
+        S["ctx"] = S["browser"].contexts[0]
+        return
     S["ctx"] = await S["browser"].new_context(**S["device"], storage_state=state or _load_state())
-    S["ctx"].on("page", _track)
 
 
 async def _page():
     if S["browser"] and not S["browser"].is_connected():
         # Someone closed the window.
-        S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={})
+        S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, mine=set())
     if S["page"] and not S["page"].is_closed():
         return S["page"]
     if not S["pw"]:
@@ -163,11 +187,13 @@ async def _page():
     if not S["browser"]:
         S["browser"] = await _launch(S["pw"])
         await _new_context()
-    open_pages = [p for p in S["ctx"].pages if not p.is_closed()]
+    open_pages = [p for p in S["ctx"].pages if p in S["mine"] and not p.is_closed()]
     if open_pages:
         S["page"] = open_pages[-1]
         return S["page"]
-    return await S["ctx"].new_page()
+    page = await S["ctx"].new_page()
+    _track(page)
+    return page
 
 
 def _device(spec, current):
@@ -213,6 +239,16 @@ async def _set_device(device):
     # Scale and touch are fixed per context, so a new one takes over the old one's cookies and storage.
     if device == S["device"]:
         return
+    if CDP_URL:
+        # The running browser's context stays, so only what a page can change: its size and colour scheme.
+        if any(device[k] != S["device"][k] for k in ("device_scale_factor", "is_mobile", "has_touch")):
+            raise ValueError("over POINTCLICK_CDP only the size and dark/light change; scale and mobile need a launch")
+        page = await _page()
+        if device["viewport"] != S["device"]["viewport"]:
+            await page.set_viewport_size(device["viewport"])
+        await page.emulate_media(color_scheme=device["color_scheme"])
+        S["device"] = device
+        return
     S["device"] = device
     if not S["ctx"]:
         return
@@ -250,7 +286,7 @@ async def _frame_snapshot(frame, full):
         box = await (await frame.frame_element()).bounding_box()
         if not box or not box["width"] or not box["height"]:
             return None
-        vp = frame.page.viewport_size
+        vp = frame.page.viewport_size or await frame.page.evaluate("() => ({height: innerHeight})")
         if not full and (box["y"] >= vp["height"] or box["y"] + box["height"] <= 0):
             return None
     return await frame.evaluate(SNAPSHOT, full)
@@ -557,6 +593,8 @@ async def console(clear: bool = True) -> str:
 @_one_at_a_time
 async def show(visible: bool = True) -> str:
     """Show the window so a person can log in; visible=false hides it. Keeps the session."""
+    if CDP_URL:
+        return "Note: attached over POINTCLICK_CDP; the window is the running browser's own.\n\n" + await _observe()
     if S["browser"] and S["browser"].is_connected() and S["headless"] == (not visible):
         return await _observe()
     url = S["page"].url if S["page"] and not S["page"].is_closed() else ""
@@ -565,7 +603,7 @@ async def show(visible: bool = True) -> str:
         state = await S["ctx"].storage_state(indexed_db=True)
         session = await _session_storage()
         await S["browser"].close()
-    S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, headless=not visible)
+    S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, mine=set(), headless=not visible)
     if not S["pw"]:
         S["pw"] = await async_playwright().start()
     S["browser"] = await _launch(S["pw"])
@@ -584,6 +622,13 @@ async def close() -> str:
     """Close the browser. The next call starts a new session."""
     await _save_state()  # no lock: close must never wait on a running call (the save is bounded)
     if S["browser"] and S["browser"].is_connected():
+        if CDP_URL:
+            # Disconnecting leaves the browser running; the tabs pointclick opened go with it.
+            for page in S["mine"]:
+                try:
+                    await page.close()
+                except PWError:
+                    pass
         await S["browser"].close()
     if S["pw"]:
         await S["pw"].stop()
@@ -599,6 +644,7 @@ async def close() -> str:
         inflight={},
         device=DESKTOP,
         headless=os.environ.get("HEADED") != "1",
+        mine=set(),
     )
     return "closed"
 

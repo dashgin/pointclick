@@ -530,7 +530,7 @@ async def test_state_file_keeps_login_across_close(browser, origins, tmp_path, m
     await browser.navigate(f"{origins[0]}/basic.html")
     await browser.evaluate("() => { document.cookie = 'a=1; max-age=3600'; localStorage.k = 'v'; }")
     assert state.exists() and (state.stat().st_mode & 0o777) == 0o600
-    await browser.close()                                  # like a restart: a new browser from the file
+    await browser.close()  # like a restart: a new browser from the file
     await browser.navigate(f"{origins[0]}/basic.html")
     got = await browser.evaluate("() => [document.cookie, localStorage.k]")
     assert json.loads(got) == ["a=1", "v"]
@@ -542,3 +542,57 @@ async def test_no_state_file_means_a_fresh_session(browser, origins):
     await browser.close()
     await browser.navigate(f"{origins[0]}/basic.html")
     assert json.loads(await browser.evaluate("() => document.cookie")) == ""
+
+
+# --- an existing browser, another build ---
+
+
+async def test_cdp_works_in_the_running_profile_in_a_tab_of_its_own(browser, origins, running):
+    theirs = running.pages[0]
+    await theirs.goto(f"{origins[0]}/basic.html")
+    await theirs.evaluate("() => { document.cookie = 'theirs=1; max-age=3600'; }")
+    t = await browser.navigate(f"{origins[0]}/basic.html")
+    assert len(running.pages) == 2
+    assert "theirs=1" in await browser.evaluate("() => document.cookie")
+    t = await browser.act("CLICK", idx(t, "Click me"))
+    assert "title: Basic" in t
+    await browser.close()
+    assert running.pages == [theirs] and not theirs.is_closed()
+
+
+async def test_cdp_never_writes_the_profile_to_the_state_file(browser, origins, running, tmp_path, monkeypatch):
+    state = tmp_path / "state.json"
+    monkeypatch.setattr(browser, "STATE_FILE", state)
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.evaluate("() => { document.cookie = 'a=1; max-age=3600'; }")
+    assert not state.exists()
+
+
+async def test_cdp_device_changes_size_and_scheme_not_scale(browser, origins, running):
+    await browser.navigate(f"{origins[0]}/basic.html", device="600x700 dark")
+    got = await browser.evaluate("() => [innerWidth, matchMedia('(prefers-color-scheme: dark)').matches]")
+    assert got == "[600, true]"
+    with pytest.raises(ValueError, match="scale and mobile"):
+        await browser.navigate(f"{origins[0]}/basic.html", device="390x844@2 mobile")
+
+
+async def test_cdp_show_leaves_the_window_alone(browser, origins, running):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    b = browser.S["browser"]
+    t = await browser.show(visible=False)
+    assert "POINTCLICK_CDP" in t and "button 'Click me'" in t and browser.S["browser"] is b
+
+
+async def test_cdp_with_nothing_listening_says_how_to_start_one(browser, origins, monkeypatch):
+    monkeypatch.setattr(browser, "CDP_URL", "http://127.0.0.1:9")
+    with pytest.raises(RuntimeError, match="--remote-debugging-port"):
+        await browser.navigate(f"{origins[0]}/basic.html")
+
+
+async def test_browser_path_launches_that_build(browser, origins, chromium_build, monkeypatch):
+    monkeypatch.setattr(browser, "BROWSER_PATH", chromium_build)
+    assert "button 'Click me'" in await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.close()
+    monkeypatch.setattr(browser, "BROWSER_PATH", "/nonexistent/chrome")
+    with pytest.raises(RuntimeError, match="BROWSER_PATH=/nonexistent/chrome"):
+        await browser.navigate(f"{origins[0]}/basic.html")
