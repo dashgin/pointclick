@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import inspect
 import json
 import os
 import re
@@ -74,6 +75,8 @@ def _one_at_a_time(tool):
             finally:
                 await _save_state()
 
+    # Python 3.13 strips docstring indentation and 3.12 doesn't; clients would pay for the spaces.
+    run.__doc__ = inspect.cleandoc(tool.__doc__)
     return run
 
 
