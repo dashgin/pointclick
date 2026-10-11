@@ -108,6 +108,7 @@ Password and file inputs are never in the list; reach them by selector.
 |---|---|
 | `HEADED=1` | Start with the window showing (`show` switches it at any time) |
 | `BROWSER_CHANNEL` | `chrome` (default), `msedge`, or `chromium` for Playwright's bundled build |
+| `POINTCLICK_STATE` | A file (e.g. `~/.pointclick/state.json`) that keeps cookies, localStorage and IndexedDB across restarts: log in once with `show`, stay logged in. Saved after every call, mode 600. Not sessionStorage. It holds your logins: never commit or share it; delete it to log out everywhere |
 
 ### Store screenshots
 

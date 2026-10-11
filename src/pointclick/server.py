@@ -57,6 +57,10 @@ S = {
 }
 
 
+# Opt-in: POINTCLICK_STATE=<file> keeps cookies, localStorage and IndexedDB across restarts. Loaded when the
+# browser starts, rewritten after every tool call and before close. Treat the file like a password.
+STATE_FILE = Path(os.environ["POINTCLICK_STATE"]).expanduser() if os.environ.get("POINTCLICK_STATE") else None
+
 # Clients may send tool calls in parallel; one browser and one current page serve them in turn.
 _lock = asyncio.Lock()
 
@@ -65,9 +69,37 @@ def _one_at_a_time(tool):
     @functools.wraps(tool)
     async def run(*args, **kwargs):
         async with _lock:
-            return await tool(*args, **kwargs)
+            try:
+                return await tool(*args, **kwargs)
+            finally:
+                await _save_state()
 
     return run
+
+
+def _load_state():
+    if not STATE_FILE or not STATE_FILE.exists():
+        return None
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except (OSError, ValueError):
+        return None  # a broken file means a fresh session, not a dead tool
+
+
+async def _save_state():
+    if not STATE_FILE or not S["ctx"] or not (S["browser"] and S["browser"].is_connected()):
+        return
+    try:
+        # bounded: an open dialog or file chooser can stall it, and a save must never hold the tool lock
+        state = await asyncio.wait_for(S["ctx"].storage_state(indexed_db=True), 5)
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = STATE_FILE.with_name(STATE_FILE.name + ".tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp, STATE_FILE)
+    except (PWError, OSError, asyncio.TimeoutError):
+        pass
 
 
 def _track(page):
@@ -113,7 +145,7 @@ async def _launch(pw):
 
 
 async def _new_context(state=None):
-    S["ctx"] = await S["browser"].new_context(**S["device"], storage_state=state)
+    S["ctx"] = await S["browser"].new_context(**S["device"], storage_state=state or _load_state())
     S["ctx"].on("page", _track)
 
 
@@ -546,7 +578,8 @@ async def show(visible: bool = True) -> str:
 
 @mcp.tool()
 async def close() -> str:
-    """Close the browser. The next call starts a fresh, empty session."""
+    """Close the browser. The next call starts a new session."""
+    await _save_state()  # no lock: close must never wait on a running call (the save is bounded)
     if S["browser"] and S["browser"].is_connected():
         await S["browser"].close()
     if S["pw"]:

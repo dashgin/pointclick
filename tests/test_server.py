@@ -522,3 +522,23 @@ async def test_long_request_does_not_hold_act(browser, origins):
 async def test_navigate_waits_for_first_data_load(browser, origins):
     t = await browser.navigate(f"{origins[0]}/network.html?boot")
     assert "button 'Booted'" in t
+
+
+async def test_state_file_keeps_login_across_close(browser, origins, tmp_path, monkeypatch):
+    state = tmp_path / "state.json"
+    monkeypatch.setattr(browser, "STATE_FILE", state)
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.evaluate("() => { document.cookie = 'a=1; max-age=3600'; localStorage.k = 'v'; }")
+    assert state.exists() and (state.stat().st_mode & 0o777) == 0o600
+    await browser.close()                                  # like a restart: a new browser from the file
+    await browser.navigate(f"{origins[0]}/basic.html")
+    got = await browser.evaluate("() => [document.cookie, localStorage.k]")
+    assert json.loads(got) == ["a=1", "v"]
+
+
+async def test_no_state_file_means_a_fresh_session(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.evaluate("() => { document.cookie = 'a=1; max-age=3600'; }")
+    await browser.close()
+    await browser.navigate(f"{origins[0]}/basic.html")
+    assert json.loads(await browser.evaluate("() => document.cookie")) == ""
