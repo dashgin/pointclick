@@ -4,6 +4,7 @@ import re
 import time
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 
 pytestmark = pytest.mark.anyio
 
@@ -284,7 +285,7 @@ async def test_screenshot_to_path_returns_path_and_size(browser, origins, tmp_pa
 
 async def test_screenshot_bad_format_is_refused(browser, origins):
     await browser.navigate(f"{origins[0]}/basic.html")
-    with pytest.raises(ValueError, match="png or jpeg"):
+    with pytest.raises(ToolError, match="png or jpeg"):
         await browser.screenshot(format="webp")
 
 
@@ -324,7 +325,7 @@ async def test_close_resets_the_device(browser, origins):
 
 
 async def test_bad_device_is_refused(browser, origins):
-    with pytest.raises(ValueError, match="440x956@3 mobile dark"):
+    with pytest.raises(ToolError, match="440x956@3 mobile dark"):
         await browser.navigate(f"{origins[0]}/basic.html", device="iPhone")
 
 
@@ -572,7 +573,7 @@ async def test_cdp_device_changes_size_and_scheme_not_scale(browser, origins, ru
     await browser.navigate(f"{origins[0]}/basic.html", device="600x700 dark")
     got = await browser.evaluate("() => [innerWidth, matchMedia('(prefers-color-scheme: dark)').matches]")
     assert got == "[600, true]"
-    with pytest.raises(ValueError, match="scale and mobile"):
+    with pytest.raises(ToolError, match="scale and mobile"):
         await browser.navigate(f"{origins[0]}/basic.html", device="390x844@2 mobile")
 
 
@@ -580,13 +581,37 @@ async def test_cdp_show_leaves_the_window_alone(browser, origins, running):
     await browser.navigate(f"{origins[0]}/basic.html")
     b = browser.S["browser"]
     t = await browser.show(visible=False)
-    assert "POINTCLICK_CDP" in t and "button 'Click me'" in t and browser.S["browser"] is b
+    assert "the person's own browser" in t and "button 'Click me'" in t and browser.S["browser"] is b
 
 
-async def test_cdp_with_nothing_listening_says_how_to_start_one(browser, origins, monkeypatch):
+async def test_cdp_with_nothing_listening_falls_back_and_says_how_to_start_one(browser, origins, monkeypatch):
     monkeypatch.setattr(browser, "CDP_URL", "http://127.0.0.1:9")
-    with pytest.raises(RuntimeError, match="--remote-debugging-port"):
-        await browser.navigate(f"{origins[0]}/basic.html")
+    t = await browser.navigate(f"{origins[0]}/basic.html")
+    assert "pointclick's own" in t and "--remote-debugging-port=9" in t and "button 'Click me'" in t
+    assert browser.S["mode"] == "own"
+
+
+async def test_asking_for_yours_with_nothing_listening_says_how_to_start_it(browser, origins, monkeypatch):
+    monkeypatch.setattr(browser, "CDP_URL", "http://127.0.0.1:9")
+    with pytest.raises(ToolError, match="--remote-debugging-port=9"):
+        await browser.navigate(f"{origins[0]}/basic.html", browser="yours")
+
+
+async def test_switching_browsers_leaves_the_persons_tabs_alone(browser, origins, running):
+    theirs = running.pages[0]
+    await browser.navigate(f"{origins[0]}/basic.html")
+    assert browser.S["mode"] == "yours", "configured and up: theirs first"
+    t = await browser.navigate(f"{origins[0]}/basic.html", browser="own")
+    assert browser.S["mode"] == "own" and "button 'Click me'" in t
+    assert running.pages == [theirs] and not theirs.is_closed(), "only the tab pointclick opened closed"
+    await browser.navigate(f"{origins[0]}/basic.html", browser="yours")
+    assert browser.S["mode"] == "yours"
+
+
+async def test_a_crash_reaches_the_agent_with_its_message(browser, origins):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    with pytest.raises(ToolError, match="Error: .*nope is not defined|ReferenceError|nope"):
+        await browser.evaluate("() => nope()")
 
 
 async def test_browser_path_launches_that_build(browser, origins, chromium_build, monkeypatch):
@@ -594,5 +619,5 @@ async def test_browser_path_launches_that_build(browser, origins, chromium_build
     assert "button 'Click me'" in await browser.navigate(f"{origins[0]}/basic.html")
     await browser.close()
     monkeypatch.setattr(browser, "BROWSER_PATH", "/nonexistent/chrome")
-    with pytest.raises(RuntimeError, match="BROWSER_PATH=/nonexistent/chrome"):
+    with pytest.raises(ToolError, match="BROWSER_PATH=/nonexistent/chrome"):
         await browser.navigate(f"{origins[0]}/basic.html")

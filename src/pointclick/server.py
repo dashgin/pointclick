@@ -7,10 +7,12 @@ import json
 import os
 import re
 import struct
+import urllib.request
 from importlib.metadata import version
 from pathlib import Path
 
 from mcp.server.mcpserver import Image, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from playwright.async_api import Error as PWError
 from playwright.async_api import TimeoutError as PWTimeout
 from playwright.async_api import async_playwright
@@ -42,7 +44,15 @@ DESKTOP = {
     "color_scheme": "light",
 }
 
-mcp = MCPServer("pointclick", version=version("pointclick"))
+INSTRUCTIONS = (
+    "Two browsers. `own` (the default): pointclick's own Chrome, clean and private; logins made in it are kept "
+    "between sessions. Use it for localhost, public sites, tests and screenshots. `yours`: the person's running "
+    "Chrome over CDP, with their profile and every site they are signed in to. Use it only when a page needs them "
+    "signed in and logging in yourself is not possible (2FA, SSO, a captcha), or they ask for it; you act as them, "
+    "so read before you click anything that sends, buys or deletes. Pick with navigate(browser=...); the choice "
+    "holds until you pick again."
+)
+mcp = MCPServer("pointclick", version=version("pointclick"), instructions=INSTRUCTIONS)
 S = {
     "pw": None,
     "browser": None,
@@ -56,6 +66,8 @@ S = {
     "device": DESKTOP,
     "headless": os.environ.get("HEADED") != "1",
     "mine": set(),
+    # "own" or "yours"; None until the first call decides.
+    "mode": None,
 }
 
 
@@ -63,10 +75,16 @@ S = {
 # browser starts, rewritten after every tool call and before close. Treat the file like a password.
 STATE_FILE = Path(os.environ["POINTCLICK_STATE"]).expanduser() if os.environ.get("POINTCLICK_STATE") else None
 
-# Opt-in: POINTCLICK_CDP=http://localhost:9222 attaches to a browser that is already running, with its profile and
-# logins. pointclick works in tabs it opens and leaves the others alone. BROWSER_PATH launches any Chromium build.
+# browser="yours" attaches to a browser that is already running, with its profile and logins, at POINTCLICK_CDP
+# (default http://localhost:9222). pointclick works in tabs it opens and leaves the others alone. Set, it is also
+# the first choice when that browser is up. BROWSER_PATH launches any Chromium build.
 CDP_URL = os.environ.get("POINTCLICK_CDP") or None
 BROWSER_PATH = os.environ.get("BROWSER_PATH") or None
+# Chrome refuses remote debugging on its default profile, so the person's debugging Chrome has a folder of its own.
+START_CHROME = (
+    'open -na "Google Chrome" --args --remote-debugging-port={port} --user-data-dir="$HOME/.pointclick/chrome"'
+    " (macOS; elsewhere: chrome --remote-debugging-port={port} --user-data-dir=<a folder>), sign in there, then retry"
+)
 
 # Clients may send tool calls in parallel; one browser and one current page serve them in turn.
 _lock = asyncio.Lock()
@@ -78,6 +96,11 @@ def _one_at_a_time(tool):
         async with _lock:
             try:
                 return await tool(*args, **kwargs)
+            except ToolError:
+                raise
+            except Exception as e:
+                # Anything else reaches the client as a bare "Error executing tool", and the agent can fix nothing.
+                raise ToolError(f"{type(e).__name__}: {e}") from e
             finally:
                 await _save_state()
 
@@ -96,7 +119,7 @@ def _load_state():
 
 
 async def _save_state():
-    if CDP_URL or not STATE_FILE or not S["ctx"] or not (S["browser"] and S["browser"].is_connected()):
+    if S["mode"] == "yours" or not STATE_FILE or not S["ctx"] or not (S["browser"] and S["browser"].is_connected()):
         return
     try:
         # bounded: an open dialog or file chooser can stall it, and a save must never hold the tool lock
@@ -137,16 +160,76 @@ def _log(line):
     del S["console"][:-300]
 
 
+def _cdp_address():
+    return CDP_URL or "http://localhost:9222"
+
+
+def _cdp_port():
+    return _cdp_address().rstrip("/").rsplit(":", 1)[-1]
+
+
+async def _cdp_up():
+    def probe():
+        try:
+            with urllib.request.urlopen(f"{_cdp_address().rstrip('/')}/json/version", timeout=0.5):
+                return True
+        except OSError:
+            return False
+
+    return await asyncio.to_thread(probe)
+
+
+async def _choose(browser):
+    """The browser this call uses: the one asked for, the one in use, or the person's if it is up and configured."""
+    if browser not in ("", "own", "yours"):
+        raise ToolError(f'browser is "own" or "yours", not {browser!r}')
+    if browser:
+        return browser
+    if S["mode"]:
+        return S["mode"]
+    if CDP_URL:
+        if await _cdp_up():
+            return "yours"
+        S["notes"].append(
+            f"No browser is listening at {_cdp_address()}, so this is pointclick's own. For the person's: "
+            + START_CHROME.format(port=_cdp_port())
+        )
+    return "own"
+
+
+async def _use(browser):
+    """Switch to ``browser`` when it is not the one in use: the other is put away, its session kept."""
+    mode = await _choose(browser)
+    if S["mode"] and mode != S["mode"]:
+        await _detach()
+    S["mode"] = mode
+
+
+async def _detach():
+    await _save_state()
+    if S["browser"] and S["browser"].is_connected():
+        if S["mode"] == "yours":
+            # Disconnecting leaves the person's browser running; only the tabs pointclick opened close.
+            for page in S["mine"]:
+                try:
+                    await page.close()
+                except PWError:
+                    pass
+        await S["browser"].close()
+    S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, mine=set(), device=DESKTOP)
+
+
 async def _launch(pw):
     # Installed Chrome first; Playwright's bundled Chromium when it's missing.
     headless = S["headless"]
-    if CDP_URL:
+    if S["mode"] == "yours":
         try:
-            return await pw.chromium.connect_over_cdp(CDP_URL)
+            return await pw.chromium.connect_over_cdp(_cdp_address())
         except PWError as e:
-            raise RuntimeError(
-                f"No browser at POINTCLICK_CDP={CDP_URL}: {str(e).splitlines()[0]} "
-                "Start one with --remote-debugging-port=9222 --user-data-dir=<a folder>"
+            raise ToolError(
+                f"The person's browser is not reachable at {_cdp_address()} ({str(e).splitlines()[0]}). Start it: "
+                + START_CHROME.format(port=_cdp_port())
+                + '. Or use browser="own".'
             ) from None
     if BROWSER_PATH:
         try:
@@ -169,7 +252,7 @@ async def _launch(pw):
 
 
 async def _new_context(state=None):
-    if CDP_URL and S["browser"].contexts:
+    if S["mode"] == "yours" and S["browser"].contexts:
         # The running browser's own profile: its cookies and logins, not a copy.
         S["ctx"] = S["browser"].contexts[0]
         return
@@ -185,6 +268,8 @@ async def _page():
     if not S["pw"]:
         S["pw"] = await async_playwright().start()
     if not S["browser"]:
+        if not S["mode"]:
+            S["mode"] = await _choose("")
         S["browser"] = await _launch(S["pw"])
         await _new_context()
     open_pages = [p for p in S["ctx"].pages if p in S["mine"] and not p.is_closed()]
@@ -239,10 +324,10 @@ async def _set_device(device):
     # Scale and touch are fixed per context, so a new one takes over the old one's cookies and storage.
     if device == S["device"]:
         return
-    if CDP_URL:
+    if S["mode"] == "yours":
         # The running browser's context stays, so only what a page can change: its size and colour scheme.
         if any(device[k] != S["device"][k] for k in ("device_scale_factor", "is_mobile", "has_touch")):
-            raise ValueError("over POINTCLICK_CDP only the size and dark/light change; scale and mobile need a launch")
+            raise ValueError('in browser "yours" only the size and dark/light change; scale and mobile need "own"')
         page = await _page()
         if device["viewport"] != S["device"]["viewport"]:
             await page.set_viewport_size(device["viewport"])
@@ -459,24 +544,26 @@ async def _run(coro):
 
 @mcp.tool()
 @_one_at_a_time
-async def navigate(url: str, device: str = "") -> str:
+async def navigate(url: str, device: str = "", browser: str = "") -> str:
     """Open url and return the indexed element table.
     device: "WxH@scale mobile dark", e.g. "440x956@3 mobile" (touch); "dark"/"light" alone keeps the size.
-      Keeps cookies, storage; closes tabs."""
+      Keeps cookies, storage; closes tabs. browser: "own"|"yours"."""
+    S["notes"] = []
+    await _use(browser)
     if device:
         await _set_device(_device(device, S["device"]))
     page = await _page()
     await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     await _settle(page)
     await _quiet(page)
-    return await _observe()
+    table = await _observe()
+    return "".join(f"Note: {n}\n" for n in S["notes"]) + ("\n" if S["notes"] else "") + table
 
 
 @mcp.tool()
 @_one_at_a_time
 async def observe(full: bool = False) -> str:
-    """Indexed table of interactive elements (all frames) plus visible text.
-    Default: viewport only (compact). full=true: whole page."""
+    """Indexed table of interactive elements (all frames) plus visible text, in view; full=true: whole page."""
     return await _observe(full)
 
 
@@ -485,9 +572,9 @@ async def observe(full: bool = False) -> str:
 async def act(operation: str, target: str = "", text: str = "") -> str:
     """Do one thing, then return the fresh table.
     operation: CLICK | TYPE | SELECT | PRESS | HOVER | SCROLL_DOWN | SCROLL_UP | WAIT.
-      Returns once the page settles (max 2s). If it is still loading after that, WAIT (returns on change, max 3s).
+      Returns once settled (max 2s); still loading then: WAIT (returns on change, max 3s).
     target: index from the table ("3"; "3:2" picks a SELECT option), or a Playwright selector
-      ("input[type=password]", "text=Send", "role=button[name='OK']") for anything not in the table.
+      ("input[type=password]", "role=button[name='OK']") for anything not in the table.
     text: TYPE value, SELECT option label (instead of "3:2"), or PRESS key ("Enter")."""
     op = operation.upper().replace("TYPE_TEXT", "TYPE")
     page = await _page()
@@ -526,7 +613,7 @@ async def act(operation: str, target: str = "", text: str = "") -> str:
 @mcp.tool()
 @_one_at_a_time
 async def upload(target: str, paths: list[str]) -> str:
-    """Set files on a file input, or on the picker a button opens. target: "input[type=file]" or the button."""
+    """Set files on a file input (target), or on the picker the target button opens."""
 
     async def do():
         el, _ = await _resolve(target)
@@ -593,8 +680,8 @@ async def console(clear: bool = True) -> str:
 @_one_at_a_time
 async def show(visible: bool = True) -> str:
     """Show the window so a person can log in; visible=false hides it. Keeps the session."""
-    if CDP_URL:
-        return "Note: attached over POINTCLICK_CDP; the window is the running browser's own.\n\n" + await _observe()
+    if S["mode"] == "yours":
+        return "Note: this is the person's own browser; its window is already theirs.\n\n" + await _observe()
     if S["browser"] and S["browser"].is_connected() and S["headless"] == (not visible):
         return await _observe()
     url = S["page"].url if S["page"] and not S["page"].is_closed() else ""
@@ -619,10 +706,10 @@ async def show(visible: bool = True) -> str:
 
 @mcp.tool()
 async def close() -> str:
-    """Close the browser. The next call starts a new session."""
+    """Close the browser; the next call starts a new session."""
     await _save_state()  # no lock: close must never wait on a running call (the save is bounded)
     if S["browser"] and S["browser"].is_connected():
-        if CDP_URL:
+        if S["mode"] == "yours":
             # Disconnecting leaves the browser running; the tabs pointclick opened go with it.
             for page in S["mine"]:
                 try:
@@ -645,6 +732,7 @@ async def close() -> str:
         device=DESKTOP,
         headless=os.environ.get("HEADED") != "1",
         mine=set(),
+        mode=None,
     )
     return "closed"
 

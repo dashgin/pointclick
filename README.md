@@ -109,7 +109,7 @@ Password and file inputs are never in the list; reach them by selector.
 | `HEADED=1` | Start with the window showing (`show` switches it at any time) |
 | `BROWSER_CHANNEL` | `chrome` (default), `msedge`, or `chromium` for Playwright's bundled build |
 | `BROWSER_PATH` | Launch this Chromium executable instead: Brave, Arc, Chrome for Testing, a custom build |
-| `POINTCLICK_CDP` | Attach to a browser that is already running (`http://localhost:9222`) instead of launching one ([below](#your-own-browser)) |
+| `POINTCLICK_CDP` | Where your own browser listens (default `http://localhost:9222`). Set, it is the first choice whenever it is up ([below](#your-own-browser)) |
 | `POINTCLICK_STATE` | A file (e.g. `~/.pointclick/state.json`) that keeps cookies, localStorage and IndexedDB across restarts: log in once with `show`, stay logged in. Saved after every call, mode 600. Not sessionStorage. It holds your logins: never commit or share it; delete it to log out everywhere |
 
 ### Store screenshots
@@ -131,15 +131,26 @@ agent's context, so a batch of captures costs a line each. `close()` goes back t
 
 ### Your own browser
 
-`POINTCLICK_CDP` attaches over the Chrome DevTools Protocol to a browser you started, so the
-agent works with that profile's cookies and logins. pointclick opens its own tab and leaves your
-other tabs alone; `close()` closes that tab and disconnects, and the browser keeps running.
+Two browsers, picked per call with `navigate(browser=...)`; the choice holds until you pick again.
+
+- `"own"` (the default): pointclick's own Chrome, clean and private. For localhost, public sites,
+  tests and screenshots. Logins made in it are kept with `POINTCLICK_STATE`.
+- `"yours"`: your running Chrome over the DevTools Protocol, with that profile's cookies and logins.
+  For a page that needs you signed in when the agent cannot log in itself (2FA, SSO, a captcha).
+  pointclick opens its own tab and leaves your other tabs alone; switching back, or `close()`,
+  closes that tab and disconnects, and the browser keeps running.
+
+The server's instructions tell the agent this, so it picks `"yours"` only when a page needs you.
+Nothing has to be configured per project. Start your Chrome when you want it:
 
 ```bash
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 --user-data-dir="$HOME/.pointclick/chrome"
-claude mcp add pointclick -e POINTCLICK_CDP=http://localhost:9222 -- uvx pointclick
+open -na "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir="$HOME/.pointclick/chrome"
 ```
+
+With `POINTCLICK_CDP` set, your browser is the first choice whenever it is up; when it is not,
+pointclick uses its own and says so, instead of failing. Asking for `"yours"` while it is not
+running answers with the command above. Every failure reaches the agent as its message, not as
+a bare "Error executing tool".
 
 Chrome 136 and later ignore `--remote-debugging-port` on the default profile, so give it a
 `--user-data-dir` of its own and log in there once. While attached, `show` does nothing (the window
@@ -234,7 +245,7 @@ it can — locally, with no account and no second model.
   try to instruct your agent. Keep the agent's permissions narrow and confirm consequential steps.
 - Each session is an isolated browser context: no access to your Chrome profile, cookies or
   passwords. Nothing persists after `close()`.
-- `POINTCLICK_CDP` is the exception: the agent acts as you, signed in to everything that profile
+- `browser="yours"` is the exception: the agent acts as you, signed in to everything that profile
   is, and so does anything else that can reach the debugging port. Keep the port on localhost and
   use a profile with only the logins the agent needs.
 - `evaluate` runs arbitrary JavaScript in the page; `upload` reads files you name from disk, and
