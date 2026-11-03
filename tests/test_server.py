@@ -249,6 +249,15 @@ async def test_upload(browser, origins, tmp_path):
     assert await text_of(browser) == "file note.txt"
 
 
+async def test_upload_over_50_mb(browser, origins, tmp_path):
+    f = tmp_path / "reel.mp4"
+    with f.open("wb") as h:  # sparse: 60 MB on paper, nothing on disk
+        h.truncate(60 * 1024 * 1024)
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.upload("#file", [str(f)])
+    assert await text_of(browser) == "file reel.mp4"
+
+
 async def test_upload_through_a_button_that_opens_a_picker(browser, origins, tmp_path):
     f = tmp_path / "page.pdf"
     f.write_text("x")
@@ -582,6 +591,16 @@ async def test_cdp_show_leaves_the_window_alone(browser, origins, running):
     b = browser.S["browser"]
     t = await browser.show(visible=False)
     assert "the person's own browser" in t and "button 'Click me'" in t and browser.S["browser"] is b
+
+
+async def test_cdp_upload_over_50_mb(browser, origins, running, tmp_path):
+    # Playwright refuses to stream files over 50 MB to an attached browser; pointclick hands Chrome the path.
+    f = tmp_path / "reel.mp4"
+    with f.open("wb") as h:
+        h.truncate(60 * 1024 * 1024)
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.upload("#file", [str(f)])
+    assert await text_of(browser) == "file reel.mp4"
 
 
 async def test_cdp_with_nothing_listening_falls_back_and_says_how_to_start_one(browser, origins, monkeypatch):

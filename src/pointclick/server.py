@@ -610,6 +610,26 @@ async def act(operation: str, target: str = "", text: str = "") -> str:
     return await _run(do())
 
 
+async def _set_files(el, paths):
+    """Hand Chrome the paths, not the bytes. Playwright's set_input_files streams the files and refuses anything over
+    50 MB on an attached browser ("yours"); Chrome on this machine reads paths from disk at any size."""
+    files = [str(Path(p).expanduser().resolve()) for p in paths]
+    page = await _page()
+    mark = os.urandom(4).hex()
+    await el.evaluate("(e, m) => e.setAttribute('data-pointclick-upload', m)", mark)
+    s = await page.context.new_cdp_session(page)
+    try:
+        find = f"document.querySelector('[data-pointclick-upload=\"{mark}\"]')"
+        found = await s.send("Runtime.evaluate", {"expression": find})
+        if oid := found["result"].get("objectId"):
+            await s.send("DOM.setFileInputFiles", {"objectId": oid, "files": files})
+        else:  # the input is inside a frame: Playwright's own way
+            await el.set_input_files(files, timeout=5000)
+    finally:
+        await el.evaluate("e => e.removeAttribute('data-pointclick-upload')")
+        await s.detach()
+
+
 @mcp.tool()
 @_one_at_a_time
 async def upload(target: str, paths: list[str]) -> str:
@@ -618,13 +638,13 @@ async def upload(target: str, paths: list[str]) -> str:
     async def do():
         el, _ = await _resolve(target)
         if await el.evaluate("e => e.tagName === 'INPUT' && e.type === 'file'"):
-            await el.set_input_files(paths, timeout=5000)
+            await _set_files(el, paths)
             return
         # A picker opened from script (a hidden input's click()) cancels at once unless the chooser is taken.
         page = await _page()
         async with page.expect_file_chooser(timeout=5000) as chooser:
             await el.click(timeout=5000, no_wait_after=True)
-        await (await chooser.value).set_files(paths, timeout=5000)
+        await _set_files((await chooser.value).element, paths)
 
     return await _run(do())
 
