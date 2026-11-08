@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 import time
 
@@ -625,6 +626,55 @@ async def test_switching_browsers_leaves_the_persons_tabs_alone(browser, origins
     assert running.pages == [theirs] and not theirs.is_closed(), "only the tab pointclick opened closed"
     await browser.navigate(f"{origins[0]}/basic.html", browser="yours")
     assert browser.S["mode"] == "yours"
+
+
+async def _until(check, limit=5.0):
+    end = time.monotonic() + limit
+    while not check() and time.monotonic() < end:
+        await asyncio.sleep(0.05)
+    return check()
+
+
+async def test_cdp_tabs_close_when_pointclick_exits_without_close(browser, origins, running):
+    theirs = running.pages[0]
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await asyncio.gather(*browser._tasks)
+    listed = json.loads(browser._tabs_file().read_text())
+    assert listed["cdp"] == browser.CDP_URL and len(listed["tabs"]) == 1
+    browser._close_tabs_now()  # what atexit and SIGTERM/SIGHUP run
+    assert await _until(lambda: running.pages == [theirs]), "the tab pointclick opened closed, theirs stayed"
+    assert not browser._tabs_file().exists()
+
+
+async def test_cdp_close_forgets_the_tabs(browser, origins, running):
+    await browser.navigate(f"{origins[0]}/basic.html")
+    await browser.close()
+    assert not browser.S["tabs"] and not list(browser.TABS_DIR.glob("*.json"))
+
+
+async def test_cdp_attach_closes_tabs_left_by_a_killed_pointclick(browser, origins, running):
+    import subprocess
+    import sys
+
+    theirs = running.pages[0]
+    orphan = await running.new_page()
+    (tid,) = await _tab_ids_of(running, orphan)
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    dead.wait()
+    browser.TABS_DIR.mkdir(parents=True)
+    (browser.TABS_DIR / f"{dead.pid}.json").write_text(json.dumps({"cdp": browser.CDP_URL, "tabs": [tid]}))
+    (browser.TABS_DIR / f"{os.getpid()}9.json").write_text("not json")  # a broken file is skipped, not fatal
+    await browser.navigate(f"{origins[0]}/basic.html")
+    assert await _until(lambda: orphan.is_closed()), "a dead pointclick's tab closed on attach"
+    assert not theirs.is_closed() and not (browser.TABS_DIR / f"{dead.pid}.json").exists()
+
+
+async def _tab_ids_of(ctx, page):
+    cdp = await ctx.new_cdp_session(page)
+    try:
+        return [(await cdp.send("Target.getTargetInfo"))["targetInfo"]["targetId"]]
+    finally:
+        await cdp.detach()
 
 
 async def test_a_crash_reaches_the_agent_with_its_message(browser, origins):

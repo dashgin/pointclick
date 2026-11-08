@@ -71,6 +71,7 @@ async def running(tmp_path, monkeypatch):
         except PWError:
             ctx = await pw.chromium.launch_persistent_context(tmp_path / "profile", args=args)
         monkeypatch.setattr(server, "CDP_URL", f"http://127.0.0.1:{port}")
+        monkeypatch.setattr(server, "TABS_DIR", tmp_path / "tabs")
         yield ctx
         await server.close()
         await ctx.close()

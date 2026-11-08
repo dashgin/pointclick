@@ -139,6 +139,9 @@ Two browsers, picked per call with `navigate(browser=...)`; the choice holds unt
   For a page that needs you signed in when the agent cannot log in itself (2FA, SSO, a captcha).
   pointclick opens its own tab and leaves your other tabs alone; switching back, or `close()`,
   closes that tab and disconnects, and the browser keeps running.
+  The tab also closes when the session ends without `close()` (the client goes away, SIGTERM,
+  SIGHUP), and after a kill, the next pointclick to attach closes it (ids kept in `~/.pointclick/tabs`,
+  or `POINTCLICK_TABS`).
 
 The server's instructions tell the agent this, so it picks `"yours"` only when a page needs you.
 Nothing has to be configured per project. Start your Chrome when you want it:

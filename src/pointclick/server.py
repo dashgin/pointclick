@@ -1,11 +1,13 @@
 """pointclick: jev's compact indexed snapshot for the fast path, Playwright for everything else."""
 
 import asyncio
+import atexit
 import functools
 import inspect
 import json
 import os
 import re
+import signal
 import struct
 import urllib.request
 from importlib.metadata import version
@@ -66,6 +68,8 @@ S = {
     "device": DESKTOP,
     "headless": os.environ.get("HEADED") != "1",
     "mine": set(),
+    # Target ids of the tabs pointclick opened in the person's browser (see TABS_DIR).
+    "tabs": set(),
     # "own" or "yours"; None until the first call decides.
     "mode": None,
 }
@@ -85,6 +89,12 @@ START_CHROME = (
     'open -na "Google Chrome" --args --remote-debugging-port={port} --user-data-dir="$HOME/.pointclick/chrome"'
     " (macOS; elsewhere: chrome --remote-debugging-port={port} --user-data-dir=<a folder>), sign in there, then retry"
 )
+
+# The tabs pointclick opens in the person's browser are listed by target id in a file per process, so they close
+# when it exits without close() (its client went away, SIGTERM, SIGHUP), and after a kill nothing can catch, the
+# next pointclick to attach closes the tabs of every one that died. Without it each ended session leaves a tab.
+TABS_DIR = Path(os.environ.get("POINTCLICK_TABS") or "~/.pointclick/tabs").expanduser()
+_tasks = set()
 
 # Clients may send tool calls in parallel; one browser and one current page serve them in turn.
 _lock = asyncio.Lock()
@@ -139,11 +149,91 @@ def _track(page):
     S["page"] = page
     S["mine"].add(page)
     page.on("popup", _track)
+    if S["mode"] == "yours":
+        task = asyncio.ensure_future(_remember(page))
+        _tasks.add(task)
+        task.add_done_callback(_tasks.discard)
     page.on("console", lambda m: _log(f"[{m.type}] {m.text}"))
     page.on("pageerror", lambda e: _log(f"[pageerror] {e}"))
     page.on("request", _request_started)
     page.on("requestfinished", _request_done)
     page.on("requestfailed", _request_done)
+
+
+async def _remember(page):
+    try:
+        cdp = await page.context.new_cdp_session(page)
+        tid = (await cdp.send("Target.getTargetInfo"))["targetInfo"]["targetId"]
+        await cdp.detach()
+    except PWError:
+        return
+    S["tabs"].add(tid)
+    _write_tabs()
+
+
+def _tabs_file(pid=None):
+    return TABS_DIR / f"{pid or os.getpid()}.json"
+
+
+def _write_tabs():
+    try:
+        if S["tabs"]:
+            TABS_DIR.mkdir(parents=True, exist_ok=True)
+            _tabs_file().write_text(json.dumps({"cdp": _cdp_address(), "tabs": sorted(S["tabs"])}))
+        else:
+            _tabs_file().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _close_targets(cdp, tids):
+    # Plain HTTP, no event loop: it also runs at exit and in a signal handler. A tab already gone answers 404.
+    for tid in tids:
+        try:
+            urllib.request.urlopen(f"{cdp.rstrip('/')}/json/close/{tid}", timeout=1).close()
+        except OSError:
+            pass
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    return True
+
+
+def _sweep():
+    """Close the tabs of every pointclick that died without closing them."""
+    for f in TABS_DIR.glob("*.json"):
+        try:
+            pid = int(f.stem)
+        except ValueError:
+            continue
+        if pid == os.getpid() or _alive(pid):
+            continue
+        try:
+            listed = json.loads(f.read_text())
+            _close_targets(listed["cdp"], listed["tabs"])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        f.unlink(missing_ok=True)
+
+
+def _close_tabs_now():
+    """At exit: close this process's tabs in the person's browser, whatever state the event loop is in."""
+    if S["tabs"]:
+        _close_targets(_cdp_address(), S["tabs"])
+        S["tabs"] = set()
+    _write_tabs()
+
+
+def _on_signal(sig, _frame):
+    _close_tabs_now()
+    signal.signal(sig, signal.SIG_DFL)
+    os.kill(os.getpid(), sig)
 
 
 def _request_started(request):
@@ -210,11 +300,14 @@ async def _detach():
     if S["browser"] and S["browser"].is_connected():
         if S["mode"] == "yours":
             # Disconnecting leaves the person's browser running; only the tabs pointclick opened close.
+            await asyncio.gather(*_tasks, return_exceptions=True)
             for page in S["mine"]:
                 try:
                     await page.close()
                 except PWError:
                     pass
+            S["tabs"] = set()
+            _write_tabs()
         await S["browser"].close()
     S.update(browser=None, ctx=None, page=None, index={}, fp=None, inflight={}, mine=set(), device=DESKTOP)
 
@@ -223,6 +316,7 @@ async def _launch(pw):
     # Installed Chrome first; Playwright's bundled Chromium when it's missing.
     headless = S["headless"]
     if S["mode"] == "yours":
+        await asyncio.to_thread(_sweep)
         try:
             return await pw.chromium.connect_over_cdp(_cdp_address())
         except PWError as e:
@@ -731,11 +825,14 @@ async def close() -> str:
     if S["browser"] and S["browser"].is_connected():
         if S["mode"] == "yours":
             # Disconnecting leaves the browser running; the tabs pointclick opened go with it.
+            await asyncio.gather(*_tasks, return_exceptions=True)
             for page in S["mine"]:
                 try:
                     await page.close()
                 except PWError:
                     pass
+            S["tabs"] = set()
+            _write_tabs()
         await S["browser"].close()
     if S["pw"]:
         await S["pw"].stop()
@@ -758,6 +855,9 @@ async def close() -> str:
 
 
 def main():
+    atexit.register(_close_tabs_now)
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, _on_signal)
     mcp.run()
 
 
